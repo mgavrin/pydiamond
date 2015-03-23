@@ -63,22 +63,6 @@ class board:
         self.allPoints=list(self.hexagon.points)
         for tri in self.triangles:
             self.allPoints+=tri.points
-        #connect neighboring points
-        for pos in self.pointPositions:
-                curPoint=self.pointPositions[pos]
-                x=pos[0]
-                y=pos[1]
-                upLeft=(x-20,y-34)
-                upRight=(x+20,y-34)
-                left=(x-40,y)
-                right=(x+40,y)
-                downLeft=(x-20,y+34)
-                downRight=(x+20,y+34)
-                dirs=[upLeft,upRight,left,right,downLeft,downRight]
-                dirWords=["up left","up right","left","right","down left","down right"]
-                for i in range(0,6):
-                    if dirs[i] in self.pointPositions:
-                        curPoint.neighbors[dirWords[i]]=self.pointPositions[dirs[i]]
         #connect inner corners of triangles
         if self.numPlayers==2:
             self.pointPositions[self.upperRight.p00.pos]=self.top.p33
@@ -106,9 +90,47 @@ class board:
             self.upperLeft.p30=self.lowerLeft.p00
             self.pointPositions[self.upperLeft.p03.pos]=self.top.p30
             self.upperLeft.p03=self.top.p30
+        #connect neighboring points
+        for pos in self.pointPositions:
+                curPoint=self.pointPositions[pos]
+                x=pos[0]
+                y=pos[1]
+                upLeft=(x-20,y-34)
+                upRight=(x+20,y-34)
+                left=(x-40,y)
+                right=(x+40,y)
+                downLeft=(x-20,y+34)
+                downRight=(x+20,y+34)
+                dirs=[upLeft,upRight,left,right,downLeft,downRight]
+                dirWords=["up left","up right","left","right","down left","down right"]
+                for i in range(0,6):
+                    if dirs[i] in self.pointPositions:
+                        curPoint.neighbors[dirWords[i]]=self.pointPositions[dirs[i]]
 
-        def getNearestPoint(self,pos):
-            pass
+    def getNearestPoint(self,pos):
+        clickX=pos[0]
+        clickY=pos[1]
+        yOffset=clickY%34 #distance in the y direction from the click to the row of points above it
+        if yOffset>17: #click is closer to row below than row above
+            yOffset=-1*(34-yOffset)
+        correctedY=clickY-yOffset
+        xOffset=clickX%40
+        if correctedY%68==0: #even-numbered row, points at 40x
+            if xOffset>20: #click is closer to point on the right than to point on the left
+                xOffset=-1*(40-xOffset)
+                correctedX=clickX-xOffset
+            else:
+                correctedX=clickX-xOffset
+        else:
+            if xOffset>20:
+                xOffset-=20
+                correctedX=clickX-xOffset
+            else:
+                correctedX=clickX+20-xOffset
+        if (correctedX,correctedY) in self.pointPositions:
+            return self.pointPositions[(correctedX,correctedY)]
+        else:
+            return False
 
 class triangleCorner:
     def __init__(self,board,orientation,inPlay,startPlayer=False):
@@ -168,10 +190,19 @@ class point: #a single position which can hold a piece
         self.pos=(self.xPos,self.yPos)
         self.neighbors={}#these get added after init to avoid circular dependency problems
 
-def attach(point1,point2):
-    point1.neighbors.append(point2)
-    point2.neighbors.append(point1)
-
+    def canJumpTo(self,destination,firstStep):
+        if destination.contents!=0:
+            return False
+        if destination in self.neighbors.values():
+            return firstStep #can step instead of jumping, but not after a jump
+        for direction in self.neighbors:
+            if self.neighbors[direction].contents!=0: #cannot jump over empty space
+                if direction in self.neighbors[direction].neighbors:
+                    if self.neighbors[direction].neighbors[direction]==destination:
+                        return True
+            
+        return False
+            
 
 class player:
     def __init__(self,number,color,board,AI):
@@ -183,20 +214,25 @@ class player:
 
     def useInput(self,event):
         if event.type==KEYDOWN and event.key==K_RETURN:
-            if len(self.curMoveChain)>0:
+            if len(self.curMoveChain)>=2: #need at least a start and an end
                 self.curMoveChain[-1].contents=self.curMoveChain[0].contents
                 self.curMoveChain[0].contents=0
+                self.curMoveChain=[]
+                self.screen.curPlayer=self.screen.players[self.number%self.board.numPlayers]#transfer the turn to the next player
         elif event.type==KEYDOWN and event.key==K_BACKSPACE:
             if len(self.curMoveChain)>0:
                 self.curMoveChain=self.curMoveChain[:-1]
         elif event.type==MOUSEBUTTONDOWN:
             pos=event.pos
             point=self.board.getNearestPoint(pos)
-            if len(self.curMoveChain)==0:
-                self.curMoveChain=[point]
-            elif self.curMoveChain[-1].canJumpTo(point):
+            if not point:
+                return False #click wasn't near any points on the board
+            elif len(self.curMoveChain)==0:
+                if point.contents==self.number: #have to start with your own point
+                    self.curMoveChain=[point]
+            elif self.curMoveChain[-1].canJumpTo(point,len(self.curMoveChain)==1):
                 self.curMoveChain.append(point)
-
+                
     def AIMove(self):
         pass
 
@@ -212,6 +248,8 @@ class screen: #the pygame screen and high-level "running the game" stuff
         self.xDim=xDim
         self.yDim=yDim
         self.players=players
+        for player in self.players:
+            player.screen=self
         pygame.init()
         self.background=pygame.image.load("blank background.png")
         self.gameScreen=pygame.display.set_mode((xDim,yDim),0,32)
@@ -224,22 +262,20 @@ class screen: #the pygame screen and high-level "running the game" stuff
         for i in range(0,len(self.instructions)):
             self.gameScreen.blit(self.font.render(self.instructions[i], True, (0,0,255)), (20, 450+30*i))
         self.curPlayer=self.players[0] #the player whose turn it is
-        self.running=True #the game has not been quit
-        self.win=False #nobody has won yet
-
+        self.running=True #the game has not been won or quit
+        self.winMessage=""#nobody has won yet
         self.mainloop() #this has to be the last thing in the init,
         #because it isn't supposed to terminate until you end the session
 
     def mainloop(self):
         while self.running:
-            for player in self.players:
-                if not player.AI:
-                    self.getInput(player)
-                else:
-                    player.AIMove()
-                self.drawScreen()
-                self.checkWin()
-            self.clock.tick(self.fps)
+            if not self.curPlayer.AI:
+                self.getInput(self.curPlayer)
+            else:
+                curPlayer.AIMove()
+            self.drawScreen()
+            self.checkWin()
+        self.clock.tick(self.fps)
 
     def getInput(self,player):
         events = pygame.event.get()
@@ -254,48 +290,49 @@ class screen: #the pygame screen and high-level "running the game" stuff
         self.gameScreen.fill(self.backgroundColor)
         colorDict={0:(255,255,255),1:(255,0,0),2:(0,255,0),3:(0,0,255)}
         for pos in self.board.pointPositions:
-            print self.board.pointPositions[pos].contents
-            colorNum=self.board.pointPositions[pos].contents
+            point=self.board.pointPositions[pos]
+            colorNum=point.contents
             color=colorDict[colorNum]
-            pygame.draw.circle(self.gameScreen,color,pos,10,10) #piece or empty white circle 
+            pygame.draw.circle(self.gameScreen,color,pos,10,0) #piece or empty white circle 
             pygame.draw.circle(self.gameScreen,(0,0,0),pos,11,1) #black border
-            #self.gameScreen.blit(self.patternUnit,pos)
-            neighbors=self.board.pointPositions[pos].neighbors
-            #TODO add edges
+            adjacent=point.neighbors.values()
+            for p in adjacent:
+                pygame.draw.line(self.gameScreen, (0,0,0), point.pos, p.pos, 1)
+        for point in self.curPlayer.curMoveChain:
+            pygame.draw.circle(self.gameScreen,(0,0,255),point.pos,12,3) #black border
         for i in range(0,len(self.instructions)):
             self.gameScreen.blit(self.font.render(self.instructions[i], True, (0,0,255)), (20, 450+30*i))
+        self.gameScreen.blit(self.font.render("Current player: "+str(self.curPlayer.number), True, (0,0,255)), (20, 10))
+        self.gameScreen.blit(self.font.render(self.winMessage, True, (0,0,255)), (20, 40))
         pygame.display.flip()
 
     def checkWin(self):
-        p1win=True
+        p1Win=True
         p2Win=True
-        if len(self.players)==3:
-            p3win=True
         for point in self.players[0].endTri.points:
             if point.contents!=1:
-                p1win=False
+                p1Win=False
                 break
         for point in self.players[1].endTri.points:
             if point.contents!=2:
-                p2win=False
+                p2Win=False
                 break
         if len(self.players)==3:
-            p3win=True
+            p3Win=True
             for point in self.players[2].endTri.points:
                 if point.contents!=3:
-                    p3win=False
+                    p3Win=False
                     break
-        winMessage=""
-        if p1win:
-            winMessage+="Player 1 wins! "
-        if p2win:
-            winMessage+="Player 2 wins! "
-        if len(self.players)==3 and p3win:
-            winMessage+="Player 3 wins!"
-        self.gameScreen.blit(self.font.render(winMessage, True, (0,0,255)), (300, 450))
+        self.winMessage=""
+        if p1Win:
+            self.winMessage+="Player 1 wins! "
+        if p2Win:
+            self.winMessage+="Player 2 wins! "
+        if len(self.players)==3 and p3Win:
+            self.winMessage+="Player 3 wins!"
         
 
-test=board(3,[False,False,False])
+test=board(2,[False,False])
 game=screen(test,450,1000,test.players)
 
 #Code provenance notes:
