@@ -13,6 +13,7 @@ class board:
             print "Badly formatted board init: please specify human or AI for each player."
         if not(2<=numPlayers and numPlayers<=3):
             print "Badly formatted init: please specifiy either 2 players or 3 players."
+        self.pointPositions={}
         self.hexagon=hexagon(self)
         if self.numPlayers==2:
             #define players
@@ -33,9 +34,9 @@ class board:
             self.player2.startTri=self.bottom
         elif self.numPlayers==3:
             #define players
-            self.player1=player(self,1,"red",self.AIs[0])
-            self.player2=player(self,2,"green",self.AIs[1])
-            self.player3=player(self,3,"blue",self.AIs[2])
+            self.player1=player(1,"red",self,self.AIs[0])
+            self.player2=player(2,"green",self,self.AIs[1])
+            self.player3=player(3,"blue",self,self.AIs[2])
             self.players=[self.player1,self.player2,self.player3]
             #define triangles
             self.top=triangleCorner(self,"top",True,self.player1)
@@ -51,39 +52,17 @@ class board:
             self.player2.endTri=self.lowerRight
             self.player3.startTri=self.lowerRight
             self.player3.endTri=self.top
-        #connect inner corners of triangles
-        self.top.p33=self.upperRight.p00
-        self.upperRight.p30=self.lowerRight.p00
-        self.lowerRight.p30=self.bottom.p03
-        self.bottom.p00=self.lowerLeft.p33
-        self.lowerLeft.p00=self.upperLeft.p30
-        self.upperLeft.p03=self.top.p30
         #collect and populate triangles
         self.triangles=[self.top,self.bottom,self.upperLeft,self.upperRight,self.lowerLeft,self.lowerRight]
         for triangle in self.triangles:
             if triangle.inPlay:
                 for point in triangle.points:
                     point.contents=triangle.startPlayer.number
-        #This is a cheap hack
-        if self.numPlayers==2:
-            self.top.p33.contents=self.top.p00.contents
-            self.top.p30.contents=self.top.p00.contents
-            self.bottom.p00.contents=self.bottom.p30.contents
-            self.bottom.p03.contents=self.bottom.p30.contents
-        else:
-            self.top.p33.contents=self.top.p00.contents
-            self.top.p30.contents=self.top.p00.contents
-            self.lowerLeft.p33.contents=self.lowerLeft.p00.contents
-            self.lowerLeft.p30.contents=self.lowerLeft.p00.contents
-            self.lowerRight.p33.contents=self.lowerRight.p00.contents
-            self.lowerRight.p30.contents=self.lowerRight.p00.contents
+        
         #handle the point list, position-->point dictionary, and connections
         self.allPoints=list(self.hexagon.points)
-        self.pointPositions={}
         for tri in self.triangles:
             self.allPoints+=tri.points
-            self.pointPositions=dict(self.pointPositions, **tri.pointPositions)
-        self.pointPositions=dict(self.pointPositions, **self.hexagon.pointPositions)
         #connect neighboring points
         for pos in self.pointPositions:
                 curPoint=self.pointPositions[pos]
@@ -100,19 +79,48 @@ class board:
                 for i in range(0,6):
                     if dirs[i] in self.pointPositions:
                         curPoint.neighbors[dirWords[i]]=self.pointPositions[dirs[i]]
+        #connect inner corners of triangles
+        if self.numPlayers==2:
+            self.pointPositions[self.upperRight.p00.pos]=self.top.p33
+            self.upperRight.p00=self.top.p33
+            self.pointPositions[self.upperLeft.p03.pos]=self.top.p30
+            self.upperLeft.p03=self.top.p30
+            self.pointPositions[self.lowerLeft.p33.pos]=self.bottom.p00
+            self.lowerLeft.p33=self.bottom.p00
+            self.pointPositions[self.lowerRight.p30.pos]=self.bottom.p03
+            self.lowerRight.p30=self.bottom.p03
+            self.pointPositions[self.lowerLeft.p00.pos]=self.upperLeft.p30
+            self.lowerLeft.p00=self.upperLeft.p30
+            self.pointPositions[self.lowerRight.p00.pos]=self.upperRight.p30
+            self.lowerRight.p00=self.upperRight.p30
+        if self.numPlayers==3:
+            self.pointPositions[self.upperRight.p00.pos]=self.top.p33
+            self.upperRight.p00=self.top.p33
+            self.pointPositions[self.upperRight.p30.pos]=self.lowerRight.p00
+            self.upperRight.p30=self.lowerRight.p00
+            self.pointPositions[self.bottom.p03.pos]=self.lowerRight.p30
+            self.bottom.p03=self.lowerRight.p30
+            self.pointPositions[self.bottom.p00.pos]=self.lowerLeft.p33
+            self.bottom.p00=self.lowerLeft.p33
+            self.pointPositions[self.upperLeft.p30.pos]=self.lowerLeft.p00
+            self.upperLeft.p30=self.lowerLeft.p00
+            self.pointPositions[self.upperLeft.p03.pos]=self.top.p30
+            self.upperLeft.p03=self.top.p30
+
+        def getNearestPoint(self,pos):
+            pass
 
 class triangleCorner:
     def __init__(self,board,orientation,inPlay,startPlayer=False):
         self.board=board
         self.orientation=orientation
-        self.inPlay=inPlay
+        self.inPlay=inPlay#True if it's one player's start and another's end, False otherwise
         self.startPlayer=startPlayer
         self.points=[]
         #mapping from tuple positions (x,y) to point instances
         self.pointPositions={}
         #offsets of self.p00, the leftmost point of the topmost row of the triangle.
-        offsets={"top":(240,24),"upper left":(60,126),"upper right":(300,126),"lower left":(120,228),"lower right":(360,228),"bottom":(180,330)}
-        #True if it's one player's start and another's end, false otherwise
+        offsets={"top":(220,34),"upper left":(40,136),"upper right":(280,136),"lower left":(100,238),"lower right":(340,238),"bottom":(160,340)}
         if self.orientation in ["top","lower left","lower right"]:
             width=[1,2,3,4]#widths of the rows of the hexagon
             perRowXOffset=-20 #bottom left corner is left of top corner
@@ -128,6 +136,7 @@ class triangleCorner:
                 addPoint="self.points.append(self.p"+str(y)+str(x)+")"
                 exec(addPoint)
                 self.pointPositions[(xPos,yPos)]=eval("self.p"+str(y)+str(x))
+                self.board.pointPositions[(xPos,yPos)]=eval("self.p"+str(y)+str(x))
 
 class hexagon:
     def __init__(self,board):
@@ -136,23 +145,27 @@ class hexagon:
         #or an x separation of 20 and a y separation of 34.
         #the leftmost point of the top row is at (200,160): 200 from left, 160 from top.
         width=[3,4,5,4,3]#widths of the rows of the hexagon
-        xOffset=[200,180,160,180,200]
+        xOffset=[180,160,140,160,180]
         self.points=[]
         self.pointPositions={}
         for y in range(0,5):
             for x in range(0,width[y]):
                 xPos=xOffset[y]+40*x
-                yPos=160+34*y
+                yPos=170+34*y
                 call="self.p"+str(y)+str(x)+"=point("+str(xPos)+","+str(yPos)+")"
                 exec(call)
                 addPoint="self.points.append(self.p"+str(y)+str(x)+")"
                 exec(addPoint)
                 self.pointPositions[(xPos,yPos)]=eval("self.p"+str(y)+str(x))
+                self.board.pointPositions[(xPos,yPos)]=eval("self.p"+str(y)+str(x))
          
 
 class point: #a single position which can hold a piece
     def __init__(self,xPos,yPos,contents=0):
-        self.contents=0 #0 is empty, 1 is player1, 2 is player2, 3 is player3
+        self.contents=contents #0 is empty, 1 is player1, 2 is player2, 3 is player3
+        self.xPos=xPos
+        self.yPos=yPos
+        self.pos=(self.xPos,self.yPos)
         self.neighbors={}#these get added after init to avoid circular dependency problems
 
 def attach(point1,point2):
@@ -166,7 +179,7 @@ class player:
         self.color=color
         self.board=board
         self.AI=AI
-        self.curMoveChain=[] #list of points in move, starting with initial location of moved piece
+        self.curMoveChain=[] #list of point instances in move, starting with initial location of moved piece
 
     def useInput(self,event):
         if event.type==KEYDOWN and event.key==K_RETURN:
@@ -241,6 +254,7 @@ class screen: #the pygame screen and high-level "running the game" stuff
         self.gameScreen.fill(self.backgroundColor)
         colorDict={0:(255,255,255),1:(255,0,0),2:(0,255,0),3:(0,0,255)}
         for pos in self.board.pointPositions:
+            print self.board.pointPositions[pos].contents
             colorNum=self.board.pointPositions[pos].contents
             color=colorDict[colorNum]
             pygame.draw.circle(self.gameScreen,color,pos,10,10) #piece or empty white circle 
@@ -281,8 +295,8 @@ class screen: #the pygame screen and high-level "running the game" stuff
         self.gameScreen.blit(self.font.render(winMessage, True, (0,0,255)), (300, 450))
         
 
-test=board(2,[False,False])
-game=screen(test,500,1000,test.players)
+test=board(3,[False,False,False])
+game=screen(test,450,1000,test.players)
 
 #Code provenance notes:
     #Instructions and code for putting text on the screen were borrowed from
