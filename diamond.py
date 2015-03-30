@@ -332,7 +332,7 @@ class screen: #the pygame screen and high-level "running the game" stuff
             self.winMessage+="Player 3 wins!"
         
 
-test=board(2,[False,False])
+test=board(2,[False,False])#change this line to control the number of players and which, if any, are AIs
 game=screen(test,450,1000,test.players)
 
 #Code provenance notes:
