@@ -264,8 +264,9 @@ class screen: #the pygame screen and high-level "running the game" stuff
         self.curPlayer=self.players[0] #the player whose turn it is
         self.running=True #the game has not been won or quit
         self.winMessage=""#nobody has won yet
-        self.mainloop() #this has to be the last thing in the init,
+        self.mainloop() #this has to be the last thing in the init before exit,
         #because it isn't supposed to terminate until you end the session
+        pygame.display.quit()
 
     def mainloop(self):
         while self.running:
