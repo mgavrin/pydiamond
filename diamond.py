@@ -1,15 +1,18 @@
 import pygame
 from pygame.locals import *
-from random import randint
+import ai
+from ai import AI
 
 #The board and its components
 class board:
-    def __init__(self,numPlayers,AIs):
+    def __init__(self,numPlayers,AIs,difficulty):
         #numPlayers should be either 2 or 3
         #AIs should be a list of length numPlayers, containing booleans:
         #True for an AI player, False for a human player.
+        # 0 <= difficulty <= 4
         self.numPlayers=numPlayers
         self.AIs=AIs
+        self.difficulty = difficulty
         if len(AIs)!=numPlayers:
             print "Badly formatted board init: please specify human or AI for each player."
         if not(2<=numPlayers and numPlayers<=3):
@@ -234,56 +237,11 @@ class player:
             elif self.curMoveChain[-1].canJumpTo(point,len(self.curMoveChain)==1):
                 self.curMoveChain.append(point)
                 
-    """
-    Current implementation is to pick a random piece and move it towards the
-    target zone, only in one direction (can be fixed by making random). No
-    guarantee that all AI pieces will make it into the target triangle as they
-    may get stuck in the wrong triangle.
-    """
     def AIMove(self):
-        # Find all pieces belonging to the current player
-        player_pieces = filter(lambda point: point.contents == self.number, self.board.allPoints)
-        piece = None
-        while True:
-            # Pick random piece
-            piece = player_pieces[randint(0, len(player_pieces) - 1)]
-            # And make sure that it has at least one empty neighbor
-            if len(filter(lambda n: piece.neighbors[n].contents == 0, piece.neighbors)) > 0:
-                break
-
-        # If AI is player 1
-        if self.number == 1:
-            for direction in piece.neighbors:
-                # Get the neighbouring point
-                neighbor = piece.neighbors[direction]
-                # Always try moving down
-                if neighbor.yPos > piece.yPos and neighbor.contents == 0:
-                    self.make_move(piece, neighbor)
-                    return True
-            return False
-
-        # If AI is player 2
-        elif self.number == 2:
-            for direction in piece.neighbors:
-                # Get the neighbouring point
-                neighbor = piece.neighbors[direction]
-                # Always try moving up
-                if neighbor.yPos < piece.yPos and neighbor.contents == 0:
-                    self.make_move(piece, neighbor)
-                    return True
-            return False
-
-        # Not implemented AI for 3-player games
-        # If AI is player 3
-        elif self.number == 3:
-            return False
-
-    def make_move(self, source, destination):
-        # Move the piece to the empty space
-        destination.contents = source.contents
-        source.contents = 0
-        # Change turn
-        self.screen.curPlayer = self.screen.players[self.number % self.board.numPlayers]
+        # Select the AI to use
+        ai_player = AI(self.board.difficulty).ai_player
+        # Run the AI for the current player
+        ai_player(self)
 
     #Current intended move procedure: click the piece you want to move,
         #then click each circle on your path, then press enter when you're done.
@@ -382,7 +340,7 @@ class screen: #the pygame screen and high-level "running the game" stuff
             self.winMessage+="Player 3 wins!"
         
 
-test=board(2,[False,True])#change this line to control the number of players and which, if any, are AIs
+test=board(2,[False,True], 0)#change this line to control the number of players and which, if any, are AIs
 game=screen(test,450,1000,test.players)
 
 #Code provenance notes:
