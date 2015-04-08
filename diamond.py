@@ -253,9 +253,9 @@ class player:
                 
     def AIMove(self, number):
         # Get the AI player function to use
-        ai_player = self.board.AIs[number - 1].ai_player
+        aip = self.board.AIs[number - 1]
         # Run the AI for the current player
-        ai_player(self)
+        aip.ai_player(self)
 
     #Current intended move procedure: click the piece you want to move,
         #then click each circle on your path, then press enter when you're done.

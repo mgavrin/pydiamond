@@ -6,13 +6,15 @@ class AI:
         self.ai_list = [ self.random_ai, self.directional_ai ]
         # Select an AI to use based on dificulty setting
         self.ai_player = self.ai_list[difficulty]
+        # A set direction that the AI should move in
+        self.set_dir = -1 # disabled to start
 
     """
     The AI player makes a move and reports whether it was successful or not.
     """
     def make_move(self, player, source, destination):
         # Make sure move can be made
-        if destination.contents != 0:
+        if source.contents == 0 or destination.contents != 0:
             return False
         # Move the piece to the empty space
         destination.contents = source.contents
@@ -20,6 +22,17 @@ class AI:
         # Change turn
         player.screen.curPlayer = player.screen.players[player.number % player.board.numPlayers]
         return True
+
+    """
+    A function that will force the AI to make a random move if its educated move-
+    generator did not work.
+    """
+    def final_move(self, player, source, destination):
+        # Try making the educated move
+        if self.make_move(player, source, destination):
+            return True
+        # But fail to a random one
+        return self.random_move(player, self.random_piece(player))
     
     """
     Find all possible moves a piece can make without jumping.
@@ -78,6 +91,8 @@ class AI:
         prefs = [("down left", "down right"), ("up left", "up right")]
         # Pick which direction pair is preferred based on player
         directions = prefs[player.number - 1]
+        # But hold on to the opposite directions just in case
+        other_dir = prefs[player.number % len(prefs)]
 
         # Make sure the piece can move in the each direction
         if directions[0] not in piece.neighbors or\
@@ -97,12 +112,32 @@ class AI:
             return self.make_move(player, piece, piece.neighbors[directions[0]])
 
         # If it can move in either direction, try aligning it with the triangle
-        if piece.xPos < 160: # Too far left
-            choice = 1
-        elif piece.xPos > 280: # Too far right
-            choice = 0
-        else: # Or pick a random direction
-            choice = randint(0, 1)
+        if piece.xPos <= 160: # Too far left
+            # Tell the AI to keep moving right
+            self.set_dir = 1
+            # And try to move it backwards
+            drctn = other_dir[self.set_dir]
+            if drctn in piece.neighbors and piece.neighbors[drctn].contents == 0 and\
+                    self.make_move(player, piece, piece.neighbors[other_dir[self.set_dir]]):
+                return True
+
+        elif piece.xPos >= 280: # Too far right
+            # Tell the AI to keep moving left
+            self.set_dir = 0
+            # And try to move it backwards
+            drctn = other_dir[self.set_dir]
+            if drctn in piece.neighbors and piece.neighbors[drctn].contents == 0 and\
+                    self.make_move(player, piece, piece.neighbors[other_dir[self.set_dir]]):
+                return True
+
+        elif piece.xPos == 220: # Piece dead-centre
+            self.set_dir == -1 # So remove forced direction
+
+        # Choose a random move direction (forced direction will override)
+        choice = randint(0, 1)
+        # If the piece is being told to go in a specific direction, do so
+        if 0 <= self.set_dir <= 1:
+            choice = self.set_dir
         neighbor = piece.neighbors[directions[choice]]
         # And finally, make the move
-        return self.make_move(player, piece, neighbor)
+        self.final_move(player, piece, neighbor)
