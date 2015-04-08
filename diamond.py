@@ -2,19 +2,23 @@ import pygame
 from pygame.locals import *
 import ai
 from ai import AI
+import sys
 
 #The board and its components
 class board:
-    def __init__(self,numPlayers,AIs,difficulty):
-        #numPlayers should be either 2 or 3
-        #AIs should be a list of length numPlayers, containing booleans:
-        #True for an AI player, False for a human player.
-        # 0 <= difficulty <= 4
+    def __init__(self,numPlayers,AIs,difficulties):
+        # numPlayers should be either 2 or 3
         self.numPlayers=numPlayers
-        self.AIs=AIs
-        self.difficulty = difficulty
+        # AIs should be a list of length numPlayers, containing booleans:
+        # True for an AI player, False for a human player.
+        # This instantiates an AI object for each AI player
+        self.AIs = get_AIs(AIs, difficulties)
+        # 0 <= difficulty <= 4
+        self.difficulties = difficulties
         if len(AIs)!=numPlayers:
             print "Badly formatted board init: please specify human or AI for each player."
+        if len(difficulties)!=numPlayers:
+            print "Badly formatted board init: please specify difficulty for each player (even non-AIs)."
         if not(2<=numPlayers and numPlayers<=3):
             print "Badly formatted init: please specifiy either 2 players or 3 players."
         self.pointPositions={}
@@ -136,6 +140,16 @@ class board:
         else:
             return False
 
+# Instantiate AI objects for each AI player
+def get_AIs(AIs, difficulties):
+    ai_list = []
+    for ai in AIs:
+        if ai:
+            ai_list.append(AI(difficulties[AIs.index(ai)]))
+        else:
+            ai_list.append(None)
+    return ai_list
+
 class triangleCorner:
     def __init__(self,board,orientation,inPlay,startPlayer=False):
         self.board=board
@@ -237,9 +251,9 @@ class player:
             elif self.curMoveChain[-1].canJumpTo(point,len(self.curMoveChain)==1):
                 self.curMoveChain.append(point)
                 
-    def AIMove(self):
-        # Select the AI to use
-        ai_player = AI(self.board.difficulty).ai_player
+    def AIMove(self, number):
+        # Get the AI player function to use
+        ai_player = self.board.AIs[number - 1].ai_player
         # Run the AI for the current player
         ai_player(self)
 
@@ -269,7 +283,8 @@ class screen: #the pygame screen and high-level "running the game" stuff
         for i in range(0,len(self.instructions)):
             self.gameScreen.blit(self.font.render(self.instructions[i], True, (0,0,255)), (20, 450+30*i))
         self.curPlayer=self.players[0] #the player whose turn it is
-        self.running=True #the game has not been won or quit
+        self.running=True #the game has not been quit
+        self.playing=True # The game has not been won
         self.winMessage=""#nobody has won yet
         self.mainloop() #this has to be the last thing in the init before exit,
         #because it isn't supposed to terminate until you end the session
@@ -277,12 +292,15 @@ class screen: #the pygame screen and high-level "running the game" stuff
 
     def mainloop(self):
         while self.running:
-            if not self.curPlayer.AI:
+            if self.playing: # Only allow play when game is not won
+                if not self.curPlayer.AI:
+                    self.getInput(self.curPlayer)
+                else:
+                    self.curPlayer.AIMove(self.curPlayer.number)
+                self.checkWin()
+            else: # Allow a player to control the game once ended (to quit)
                 self.getInput(self.curPlayer)
-            else:
-                self.curPlayer.AIMove()
             self.drawScreen()
-            self.checkWin()
         self.clock.tick(self.fps)
 
     def getInput(self,player):
@@ -292,7 +310,8 @@ class screen: #the pygame screen and high-level "running the game" stuff
                 self.running=False
                 break
             else:
-                player.useInput(event)
+                if self.playing:
+                    player.useInput(event)
 
     def drawScreen(self):
         self.gameScreen.fill(self.backgroundColor)
@@ -334,13 +353,16 @@ class screen: #the pygame screen and high-level "running the game" stuff
         self.winMessage=""
         if p1Win:
             self.winMessage+="Player 1 wins! "
+            self.playing = False
         if p2Win:
             self.winMessage+="Player 2 wins! "
+            self.playing = False
         if len(self.players)==3 and p3Win:
             self.winMessage+="Player 3 wins!"
+            self.playing = False
         
 
-test=board(2,[False,True], 0)#change this line to control the number of players and which, if any, are AIs
+test=board(2,[True,True], [1, 1])#change this line to control the number of players and which, if any, are AIs
 game=screen(test,450,1000,test.players)
 
 #Code provenance notes:
