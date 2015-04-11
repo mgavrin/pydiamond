@@ -25,8 +25,8 @@ class board:
         self.hexagon=hexagon(self)
         if self.numPlayers==2:
             #define players
-            self.player1=player(1,"red",self,self.AIs[0])
-            self.player2=player(2,"blue",self,self.AIs[1])
+            self.player1=player(1,"red",self,self.AIs[0],False)
+            self.player2=player(2,"blue",self,self.AIs[1],False)
             self.players=[self.player1,self.player2]
             #define triangles
             self.top=triangleCorner(self,"top",True,self.player1)
@@ -42,9 +42,9 @@ class board:
             self.player2.startTri=self.bottom
         elif self.numPlayers==3:
             #define players
-            self.player1=player(1,"red",self,self.AIs[0])
-            self.player2=player(2,"green",self,self.AIs[1])
-            self.player3=player(3,"blue",self,self.AIs[2])
+            self.player1=player(1,"red",self,self.AIs[0],False)
+            self.player2=player(2,"green",self,self.AIs[1],False)
+            self.player3=player(3,"blue",self,self.AIs[2],False)
             self.players=[self.player1,self.player2,self.player3]
             #define triangles
             self.top=triangleCorner(self,"top",True,self.player1)
@@ -223,20 +223,33 @@ class point: #a single position which can hold a piece
             
 
 class player:
-    def __init__(self,number,color,board,AI):
+    def __init__(self,number,color,board,AI,networked):
         self.number=number
         self.color=color
         self.board=board
         self.AI=AI
-        self.curMoveChain=[] #list of point instances in move, starting with initial location of moved piece
+        self.networked = networked # Whether player is on a networked
+        # List of point instances in move,
+        # starting with initial location of moved piece
+        self.curMoveChain=[]
+      
+    def make_move(self, source, destination):
+        # Make sure move can be made
+        if source.contents == 0 or destination.contents != 0:
+            return False
+        # Move the piece to the empty space
+        destination.contents = source.contents
+        source.contents = 0
+        # Change turn
+        self.screen.curPlayer = self.screen.players[self.number % self.board.numPlayers]
+        return True
 
     def useInput(self,event):
         if event.type==KEYDOWN and event.key==K_RETURN:
             if len(self.curMoveChain)>=2: #need at least a start and an end
-                self.curMoveChain[-1].contents=self.curMoveChain[0].contents
-                self.curMoveChain[0].contents=0
-                self.curMoveChain=[]
-                self.screen.curPlayer=self.screen.players[self.number%self.board.numPlayers]#transfer the turn to the next player
+                # Actually make the move
+                self.make_move(self.curMoveChain[0], self.curMoveChain[-1])
+                self.curMoveChain = [] # Empty the move chain
         elif event.type==KEYDOWN and event.key==K_BACKSPACE:
             if len(self.curMoveChain)>0:
                 self.curMoveChain=self.curMoveChain[:-1]
@@ -250,6 +263,12 @@ class player:
                     self.curMoveChain=[point]
             elif self.curMoveChain[-1].canJumpTo(point,len(self.curMoveChain)==1):
                 self.curMoveChain.append(point)
+
+    #Current intended move procedure: click the piece you want to move,
+        #then click each circle on your path, then press enter when you're done.
+        #If you click somewhere wrong, press backspace to undo it.
+        #If you click somewhere illegal, nothing will happen.
+        #If you press Enter without having selected a valid move, nothing will happen.
                 
     def AIMove(self, number):
         # Get the AI player function to use
@@ -257,20 +276,23 @@ class player:
         # Run the AI for the current player
         aip.ai_player(self)
 
-    #Current intended move procedure: click the piece you want to move,
-        #then click each circle on your path, then press enter when you're done.
-        #If you click somewhere wrong, press backspace to undo it.
-        #If you click somewhere illegal, nothing will happen.
-        #If you press Enter without having selected a valid move, nothing will happen.
+class Network:
+    def __init__(self, host, ip_addr):
+        self.host = host
+        self.ip = ip_addr
+    
+    def get_turn(self, player):
+        pass
 
 class screen: #the pygame screen and high-level "running the game" stuff
-    def __init__(self,board,xDim,yDim,players):
+    def __init__(self,board,xDim,yDim,players,network):
         self.board=board
         self.xDim=xDim
         self.yDim=yDim
         self.players=players
         for player in self.players:
             player.screen=self
+        self.network = network # Can play a networked game
         pygame.init()
         self.background=pygame.image.load("blank background.png")
         self.gameScreen=pygame.display.set_mode((xDim,yDim),0,32)
@@ -293,15 +315,23 @@ class screen: #the pygame screen and high-level "running the game" stuff
     def mainloop(self):
         while self.running:
             if self.playing: # Only allow play when game is not won
-                if not self.curPlayer.AI:
-                    self.getInput(self.curPlayer)
-                else:
-                    self.curPlayer.AIMove(self.curPlayer.number)
-                self.checkWin()
+                self.play_turn(self.curPlayer) # Play the turn
+                self.checkWin() # Check if the game is won
             else: # Allow a player to control the game once ended (to quit)
                 self.getInput(self.curPlayer)
             self.drawScreen()
         self.clock.tick(self.fps)
+
+    def play_turn(self, player):
+        # If the player is connected by networked
+        if player.networked:
+            self.network.get_turn(self.player)
+        # Otherwise if they're a human on the computer
+        elif not player.AI:
+            self.getInput(player)
+        # Otherwise it's an AI
+        else:
+            player.AIMove(player.number)
 
     def getInput(self,player):
         events = pygame.event.get()
@@ -362,8 +392,8 @@ class screen: #the pygame screen and high-level "running the game" stuff
             self.playing = False
         
 
-test=board(2,[True,True], [1, 1])#change this line to control the number of players and which, if any, are AIs
-game=screen(test,450,1000,test.players)
+test=board(2,[False,False], [1, 1])#change this line to control the number of players and which, if any, are AIs
+game=screen(test,450,1000,test.players, None)
 
 #Code provenance notes:
     #Instructions and code for putting text on the screen were borrowed from

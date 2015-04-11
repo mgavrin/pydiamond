@@ -10,18 +10,10 @@ class AI:
         self.set_dir = -1 # disabled to start
 
     """
-    The AI player makes a move and reports whether it was successful or not.
+    Simple wrapper for the make_move function.
     """
     def make_move(self, player, source, destination):
-        # Make sure move can be made
-        if source.contents == 0 or destination.contents != 0:
-            return False
-        # Move the piece to the empty space
-        destination.contents = source.contents
-        source.contents = 0
-        # Change turn
-        player.screen.curPlayer = player.screen.players[player.number % player.board.numPlayers]
-        return True
+        return player.make_move(source, destination)
 
     """
     A function that will force the AI to make a random move if its educated move-
