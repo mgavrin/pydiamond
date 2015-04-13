@@ -4,6 +4,16 @@ import ai
 from ai import AI
 import sys
 
+# Instantiate AI objects for each AI player
+def get_AIs(AIs, difficulties):
+    ai_list = []
+    for ai in AIs:
+        if ai:
+            ai_list.append(AI(difficulties[AIs.index(ai)]))
+        else:
+            ai_list.append(None)
+    return ai_list
+
 #The board and its components
 class board:
     def __init__(self,numPlayers,AIs,difficulties):
@@ -140,15 +150,18 @@ class board:
         else:
             return False
 
-# Instantiate AI objects for each AI player
-def get_AIs(AIs, difficulties):
-    ai_list = []
-    for ai in AIs:
-        if ai:
-            ai_list.append(AI(difficulties[AIs.index(ai)]))
-        else:
-            ai_list.append(None)
-    return ai_list
+    # Make a move given source and destination points
+    def make_move(self, source, destination):
+        # Make sure move can be made
+        if source.contents == 0 or destination.contents != 0:
+            return False
+        # Move the piece to the empty space
+        destination.contents = source.contents
+        source.contents = 0
+        player = self.screen.curPlayer
+        # Change turn
+        self.screen.curPlayer = self.screen.players[player.number % self.numPlayers]
+        return True
 
 class triangleCorner:
     def __init__(self,board,orientation,inPlay,startPlayer=False):
@@ -232,18 +245,11 @@ class player:
         # List of point instances in move,
         # starting with initial location of moved piece
         self.curMoveChain=[]
-      
-    def make_move(self, source, destination):
-        # Make sure move can be made
-        if source.contents == 0 or destination.contents != 0:
-            return False
-        # Move the piece to the empty space
-        destination.contents = source.contents
-        source.contents = 0
-        # Change turn
-        self.screen.curPlayer = self.screen.players[self.number % self.board.numPlayers]
-        return True
 
+    # Get all pieces belonging to this player
+    def get_pieces(self):
+        return filter(lambda point: point.contents == self.number, self.board.allPoints)
+      
     def useInput(self,event):
         if event.type==KEYDOWN and event.key==K_RETURN:
             if len(self.curMoveChain)>=2: #need at least a start and an end
@@ -287,6 +293,7 @@ class Network:
 class screen: #the pygame screen and high-level "running the game" stuff
     def __init__(self,board,xDim,yDim,players,network):
         self.board=board
+        self.board.screen=self
         self.xDim=xDim
         self.yDim=yDim
         self.players=players
