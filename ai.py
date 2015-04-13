@@ -27,7 +27,7 @@ class AI:
         return self.random_move(player, self.random_piece(player))
     
     """
-    Find all possible jumps that a piece can make starting in one direction.
+    Find all possible jumps that a piece can make by starting in one direction.
     """
     def find_jumps(self, piece, direction, jumps):
         # Make sure a jump can be made in this direction
@@ -40,7 +40,8 @@ class AI:
                 # If the destination is already in the jumps array, return
                 if dest in jumps:
                     return jumps
-                jumps.append(dest) # Add the destination to the possible jumps
+                # Add the destination to the possible jumps
+                jumps.append(dest)
                 # Then find all possible jumps from that place
                 for drctn in dest.neighbors:
                     # Do not check a jump right back
