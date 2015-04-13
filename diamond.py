@@ -392,7 +392,7 @@ class screen: #the pygame screen and high-level "running the game" stuff
             self.playing = False
         
 
-test=board(2,[True,True], [1, 1])#change this line to control the number of players and which, if any, are AIs
+test=board(2,[False,True], [1, 0])#change this line to control the number of players and which, if any, are AIs
 game=screen(test,450,1000,test.players, None)
 
 #Code provenance notes:
