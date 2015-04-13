@@ -3,7 +3,7 @@ from random import randint
 class AI:
     def __init__(self, difficulty):
         # List of available AIs
-        self.ai_list = [ self.random_ai, self.directional_ai ]
+        self.ai_list = [ self.random_ai, self.directional_slide_ai ]
         # Select an AI to use based on dificulty setting
         self.ai_player = self.ai_list[difficulty]
         # A set direction that the AI should move in
@@ -27,10 +27,41 @@ class AI:
         return self.random_move(player, self.random_piece(player))
     
     """
+    Find all possible jumps that a piece can make starting in one direction.
+    """
+    def find_jumps(self, piece, direction, jumps):
+        # Make sure a jump can be made in this direction
+        if direction in piece.neighbors\
+                and direction in piece.neighbors[direction].neighbors:
+            adjacent = piece.neighbors[direction]
+            dest = adjacent.neighbors[direction]
+            # If there is something to skip over and land in
+            if adjacent.contents != 0 and dest.contents == 0:
+                # If the destination is already in the jumps array, return
+                if dest in jumps:
+                    return jumps
+                jumps.append(dest) # Add the destination to the possible jumps
+                # Then find all possible jumps from that place
+                for drctn in dest.neighbors:
+                    # Do not check a jump right back
+                    if drctn == opposite(direction):
+                        continue
+                    jumps = self.find_jumps(dest, drctn, jumps)
+        return jumps
+    
+    """
     Find all possible moves a piece can make without jumping.
     """
     def possible_moves(self, piece):
-        return filter(lambda n: piece.neighbors[n].contents == 0, piece.neighbors)
+        moves = []
+        # For all possible direction of the piece
+        for direction in piece.neighbors:
+            # Add the possible neighbouring moves
+            if piece.neighbors[direction].contents == 0:
+                moves.append(piece.neighbors[direction])
+            # And find all possible jumps in that direction
+            moves = self.find_jumps(piece, direction, moves)
+        return moves
 
     """
     Simple function to pick a random piece that can move in at least one direction.
@@ -52,12 +83,12 @@ class AI:
     A simple random move choser (always good for last-resort).
     """
     def random_move(self, player, piece):
-        # Now find the directions that it can move in
-        directions = self.possible_moves(piece)
+        # Now find the destinations it can move to
+        destinations = self.possible_moves(piece)
         # Then pick a random direction to move in
-        direction = directions[randint(0, len(directions) - 1)]
+        dest = destinations[randint(0, len(destinations) - 1)]
         # And make the move (it must be possible, but be sure of it)
-        if self.make_move(player, piece, piece.neighbors[direction]):
+        if self.make_move(player, piece, dest):
             return True
         return self.random_move(player, piece)
 
@@ -72,11 +103,10 @@ class AI:
 
     """
     Current implementation is to pick a random piece and move it in the
-    direction of the target zone in relation to the start. No guarantee that
-    all AI pieces will make it into the target triangle as they may get stuck
-    in the wrong triangle.
+    direction of the target zone in relation to the start. The AI will not
+    make jumps and take a while to get towards the end triangle.
     """
-    def directional_ai(self, player):
+    def directional_slide_ai(self, player):
         # Pick a random piece to move
         piece = self.random_piece(player)
         # Direction preferences
@@ -94,7 +124,7 @@ class AI:
                 # If the piece is as high as it can go in its end triangle,
                 # move another piece
                 if (piece.xPos, piece.yPos) in player.endTri.pointPositions:
-                    return self.directional_ai(player)
+                    return self.directional_slide_ai(player)
                 # If it cannot move in a preferred direction, pick a random one
                 return self.random_move(player, piece)
             # Otherwise it can move in only one of the two preferred ones,
@@ -133,3 +163,18 @@ class AI:
         neighbor = piece.neighbors[directions[choice]]
         # And finally, make the move
         self.final_move(player, piece, neighbor)
+
+# Simply get the opposite move direction
+def opposite(direction):
+    if direction == "up left":
+        return "down right"
+    if direction == "down left":
+        return "up right"
+    if direction == "left":
+        return "right"
+    if direction == "right":
+        return "left"
+    if direction == "up right":
+        return "down left"
+    if direction == "down right":
+        return "up left"
