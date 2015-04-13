@@ -96,15 +96,15 @@ class AI:
     """
     A simple random move choser (always good for last-resort).
     """
-    def random_move(self, player, piece):
+    def random_move(self, board, piece):
         # Now find the destinations it can move to
         destinations = self.possible_moves(piece)
         # Then pick a random direction to move in
         dest = destinations[randint(0, len(destinations) - 1)]
         # And make the move (it must be possible, but be sure of it)
-        if self.make_move(player, piece, dest):
+        if self.make_move(board, piece, dest):
             return True
-        return self.random_move(player, piece)
+        return self.random_move(board, piece)
 
     """
     Simply AI that just plays random moves.
@@ -113,7 +113,7 @@ class AI:
         # Pick a random piece to move
         piece = self.random_piece(board)
         # Move that piece in a random direction
-        return self.random_move(board.curPlayer, piece)
+        return self.random_move(board, piece)
 
     """
     Current implementation is to pick a random piece and move it in the
@@ -139,14 +139,14 @@ class AI:
                 # If the piece is as high as it can go in its end triangle,
                 # move another piece
                 if (piece.xPos, piece.yPos) in player.endTri.pointPositions:
-                    return self.directional_slide_ai(player)
+                    return self.directional_slide_ai(board)
                 # If it cannot move in a preferred direction, pick a random one
-                return self.random_move(player, piece)
+                return self.random_move(board, piece)
             # Otherwise it can move in only one of the two preferred ones,
             # so pick the one that it can move in.
-            return self.make_move(player, piece, piece.neighbors[directions[1]])
+            return self.make_move(board, piece, piece.neighbors[directions[1]])
         if directions[1] not in piece.neighbors:
-            return self.make_move(player, piece, piece.neighbors[directions[0]])
+            return self.make_move(board, piece, piece.neighbors[directions[0]])
 
         # If it can move in either direction, try aligning it with the triangle
         if piece.xPos <= 160: # Too far left
@@ -155,7 +155,7 @@ class AI:
             # And try to move it backwards
             drctn = other_dir[self.set_dir]
             if drctn in piece.neighbors and piece.neighbors[drctn].contents == 0 and\
-                    self.make_move(player, piece, piece.neighbors[other_dir[self.set_dir]]):
+                    self.make_move(board, piece, piece.neighbors[other_dir[self.set_dir]]):
                 return True
 
         elif piece.xPos >= 280: # Too far right
@@ -164,7 +164,7 @@ class AI:
             # And try to move it backwards
             drctn = other_dir[self.set_dir]
             if drctn in piece.neighbors and piece.neighbors[drctn].contents == 0 and\
-                    self.make_move(player, piece, piece.neighbors[other_dir[self.set_dir]]):
+                    self.make_move(board, piece, piece.neighbors[other_dir[self.set_dir]]):
                 return True
 
         elif piece.xPos == 220: # Piece dead-centre
@@ -177,7 +177,7 @@ class AI:
             choice = self.set_dir
         neighbor = piece.neighbors[directions[choice]]
         # And finally, make the move
-        self.final_move(player, piece, neighbor)
+        self.final_move(board, piece, neighbor)
 
     """
     An AI player that generates a tree of game states and then searches for the
