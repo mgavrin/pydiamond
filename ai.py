@@ -1,5 +1,10 @@
 from random import randint
 
+class TreeNode:
+    def __init__(self, element):
+        self.element = element
+        self.children = []
+
 class AI:
     def __init__(self, difficulty):
         # List of available AIs
@@ -51,7 +56,7 @@ class AI:
         return jumps
     
     """
-    Find all possible moves a piece can make without jumping.
+    Find all possible moves a piece can make.
     """
     def possible_moves(self, piece):
         moves = []
@@ -164,18 +169,3 @@ class AI:
         neighbor = piece.neighbors[directions[choice]]
         # And finally, make the move
         self.final_move(player, piece, neighbor)
-
-# Simply get the opposite move direction
-def opposite(direction):
-    if direction == "up left":
-        return "down right"
-    if direction == "down left":
-        return "up right"
-    if direction == "left":
-        return "right"
-    if direction == "right":
-        return "left"
-    if direction == "up right":
-        return "down left"
-    if direction == "down right":
-        return "up left"
