@@ -1,5 +1,5 @@
 from random import randint
-from copy import copy
+from copy import deepcopy
 
 class TreeNode:
     def __init__(self, element):
@@ -28,19 +28,19 @@ class AI:
     """
     Simple wrapper for the make_move function.
     """
-    def make_move(self, player, source, destination):
-        return player.board.make_move(source, destination)
+    def make_move(self, board, source, destination):
+        return board.make_move(source, destination)
 
     """
     A function that will force the AI to make a random move if its educated move-
     generator did not work.
     """
-    def final_move(self, player, source, destination):
+    def final_move(self, board, source, destination):
         # Try making the educated move
-        if self.make_move(player, source, destination):
+        if self.make_move(board, source, destination):
             return True
         # But fail to a random one
-        return self.random_move(player, self.random_piece(player))
+        return self.random_move(board, self.random_piece(board))
     
     """
     Find all possible jumps that a piece can make by starting in one direction.
@@ -80,9 +80,9 @@ class AI:
     """
     Simple function to pick a random piece that can move in at least one direction.
     """
-    def random_piece(self, player):
+    def random_piece(self, board):
         # Find all pieces belonging to the current player
-        player_pieces = player.get_pieces()
+        player_pieces = board.get_pieces(board.curPlayer)
         # Pick a random piece that has at least one empty neighbour
         piece = None
         while True:
@@ -109,20 +109,21 @@ class AI:
     """
     Simply AI that just plays random moves.
     """
-    def random_ai(self, player):
+    def random_ai(self, board):
         # Pick a random piece to move
-        piece = self.random_piece(player)
+        piece = self.random_piece(board)
         # Move that piece in a random direction
-        return self.random_move(player, piece)
+        return self.random_move(board.curPlayer, piece)
 
     """
     Current implementation is to pick a random piece and move it in the
     direction of the target zone in relation to the start. The AI will not
     make jumps and take a while to get towards the end triangle.
     """
-    def directional_slide_ai(self, player):
+    def directional_slide_ai(self, board):
+        player = board.curPlayer
         # Pick a random piece to move
-        piece = self.random_piece(player)
+        piece = self.random_piece(board)
         # Direction preferences
         prefs = [("down left", "down right"), ("up left", "up right")]
         # Pick which direction pair is preferred based on player
@@ -184,45 +185,45 @@ class AI:
     An element is made of its score value, the move that got it there and the
     board object that it results in.
     """
-    def minimax_ai(self, player):
+    def minimax_ai(self, board):
         # Start the tree with the current game state
         game_tree = TreeNode({
             "score": 0,
             "move": None,
-            "board": player.board })
+            "board": board })
         # Then find all possible states leading from it
-        game_tree.children = self.build_tree(player, 2, 0)
+        game_tree.children = self.build_tree(board, 2, 0)
         # Now find the best possible move
         move = self.find_best(game_tree)
         # And finally make the move
-        return self.final_move(player, move[0], move[1])
+        return self.final_move(board, move[0], move[1])
 
     """
     Build a tree of all game possibilities up to a certain depth.
     """
-    def build_tree(self, player, max_depth, depth):
+    def build_tree(self, board, max_depth, depth):
         # Stop looking at a certain depth
         if depth >= max_depth:
             return None
         moves = []
         # Find all possible moves the player can make
-        for piece in player.get_pieces():
+        for piece in board.get_pieces(board.curPlayer):
             for move in self.possible_moves(piece):
                 moves.append((piece, move))
         nodes = [] # Tree nodes to return
         # For every possible move, generate a tree item and keep looking
         for move in moves:
             # Get a new board object by copying the old one
-            board = copy(player.board)
+            new_board = deepcopy(board)
             # Make the move (thus changing player's turn)
-            self.make_move(player, move[0], move[1])
+            self.make_move(new_board, move[0], move[1])
             # Build a tree node to add to the list of nodes
             node = TreeNode({
-                "score": self.evaluate(player, board),
+                "score": self.evaluate(board.curPlayer, new_board),
                 "move": move,
-                "board": board })
+                "board": new_board })
             # Now look further down the tree
-            node.children = self.build_tree(player, max_depth, depth + 1)
+            node.children = self.build_tree(new_board, max_depth, depth + 1)
             nodes.append(node)
         return nodes
 
@@ -230,4 +231,4 @@ class AI:
     Find the best possible move in a game tree.
     """
     def find_best(self, game_tree):
-        return game_tree.children[randint(0, len(game_tree.children))].element["move"]
+        return game_tree.children[randint(0, len(game_tree.children) - 1)].element["move"]

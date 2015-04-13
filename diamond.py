@@ -70,6 +70,7 @@ class board:
             self.player2.endTri=self.lowerRight
             self.player3.startTri=self.lowerRight
             self.player3.endTri=self.top
+        self.curPlayer = self.players[0]
         #collect and populate triangles
         self.triangles=[self.top,self.bottom,self.upperLeft,self.upperRight,self.lowerLeft,self.lowerRight]
         for triangle in self.triangles:
@@ -158,10 +159,19 @@ class board:
         # Move the piece to the empty space
         destination.contents = source.contents
         source.contents = 0
-        player = self.screen.curPlayer
         # Change turn
-        self.screen.curPlayer = self.screen.players[player.number % self.numPlayers]
+        self.curPlayer = self.players[self.curPlayer.number % self.numPlayers]
         return True
+                
+    # Get all pieces belonging to the given player
+    def get_pieces(self, player):
+        return filter(lambda point: point.contents == player.number, self.allPoints)
+      
+    def AIMove(self, number):
+        # Get the AI player function to use
+        aip = self.AIs[number - 1]
+        # Run the AI for the current player
+        aip.ai_player(self)
 
 class triangleCorner:
     def __init__(self,board,orientation,inPlay,startPlayer=False):
@@ -246,10 +256,6 @@ class player:
         # starting with initial location of moved piece
         self.curMoveChain=[]
 
-    # Get all pieces belonging to this player
-    def get_pieces(self):
-        return filter(lambda point: point.contents == self.number, self.board.allPoints)
-      
     def useInput(self,event):
         if event.type==KEYDOWN and event.key==K_RETURN:
             if len(self.curMoveChain)>=2: #need at least a start and an end
@@ -275,12 +281,6 @@ class player:
         #If you click somewhere wrong, press backspace to undo it.
         #If you click somewhere illegal, nothing will happen.
         #If you press Enter without having selected a valid move, nothing will happen.
-                
-    def AIMove(self, number):
-        # Get the AI player function to use
-        aip = self.board.AIs[number - 1]
-        # Run the AI for the current player
-        aip.ai_player(self)
 
 class Network:
     def __init__(self, host, ip_addr):
@@ -291,15 +291,12 @@ class Network:
         pass
 
 class screen: #the pygame screen and high-level "running the game" stuff
-    def __init__(self,board,xDim,yDim,players,network):
+    def __init__(self,board,xDim,yDim,network):
         self.board=board
-        self.board.screen=self
+        self.network = network # Can play a networked game
+        # Graphics related things
         self.xDim=xDim
         self.yDim=yDim
-        self.players=players
-        for player in self.players:
-            player.screen=self
-        self.network = network # Can play a networked game
         pygame.init()
         self.background=pygame.image.load("blank background.png")
         self.gameScreen=pygame.display.set_mode((xDim,yDim),0,32)
@@ -311,7 +308,6 @@ class screen: #the pygame screen and high-level "running the game" stuff
         self.instructions=["Click the piece you want to move,","then each space in its path.","Press Enter when you are finished.","Press Backspace to undo a click."]
         for i in range(0,len(self.instructions)):
             self.gameScreen.blit(self.font.render(self.instructions[i], True, (0,0,255)), (20, 450+30*i))
-        self.curPlayer=self.players[0] #the player whose turn it is
         self.running=True #the game has not been quit
         self.playing=True # The game has not been won
         self.winMessage=""#nobody has won yet
@@ -322,23 +318,24 @@ class screen: #the pygame screen and high-level "running the game" stuff
     def mainloop(self):
         while self.running:
             if self.playing: # Only allow play when game is not won
-                self.play_turn(self.curPlayer) # Play the turn
+                self.play_turn(self.board) # Play the turn
                 self.checkWin() # Check if the game is won
             else: # Allow a player to control the game once ended (to quit)
-                self.getInput(self.curPlayer)
+                self.getInput(self.board.curPlayer)
             self.drawScreen()
         self.clock.tick(self.fps)
 
-    def play_turn(self, player):
+    def play_turn(self, board):
+        player = board.curPlayer
         # If the player is connected by networked
         if player.networked:
-            self.network.get_turn(self.player)
+            self.network.get_turn(player)
         # Otherwise if they're a human on the computer
         elif not player.AI:
             self.getInput(player)
         # Otherwise it's an AI
         else:
-            player.AIMove(player.number)
+            board.AIMove(player.number)
 
     def getInput(self,player):
         events = pygame.event.get()
@@ -362,28 +359,28 @@ class screen: #the pygame screen and high-level "running the game" stuff
             adjacent=point.neighbors.values()
             for p in adjacent:
                 pygame.draw.line(self.gameScreen, (0,0,0), point.pos, p.pos, 1)
-        for point in self.curPlayer.curMoveChain:
+        for point in self.board.curPlayer.curMoveChain:
             pygame.draw.circle(self.gameScreen,(0,0,255),point.pos,12,3) #black border
         for i in range(0,len(self.instructions)):
             self.gameScreen.blit(self.font.render(self.instructions[i], True, (0,0,255)), (20, 450+30*i))
-        self.gameScreen.blit(self.font.render("Current player: "+str(self.curPlayer.number), True, (0,0,255)), (20, 10))
+        self.gameScreen.blit(self.font.render("Current player: "+str(self.board.curPlayer.number), True, (0,0,255)), (20, 10))
         self.gameScreen.blit(self.font.render(self.winMessage, True, (0,0,255)), (20, 40))
         pygame.display.flip()
 
     def checkWin(self):
         p1Win=True
         p2Win=True
-        for point in self.players[0].endTri.points:
+        for point in self.board.players[0].endTri.points:
             if point.contents!=1:
                 p1Win=False
                 break
-        for point in self.players[1].endTri.points:
+        for point in self.board.players[1].endTri.points:
             if point.contents!=2:
                 p2Win=False
                 break
-        if len(self.players)==3:
+        if len(self.board.players)==3:
             p3Win=True
-            for point in self.players[2].endTri.points:
+            for point in self.board.players[2].endTri.points:
                 if point.contents!=3:
                     p3Win=False
                     break
@@ -394,13 +391,13 @@ class screen: #the pygame screen and high-level "running the game" stuff
         if p2Win:
             self.winMessage+="Player 2 wins! "
             self.playing = False
-        if len(self.players)==3 and p3Win:
+        if len(self.board.players)==3 and p3Win:
             self.winMessage+="Player 3 wins!"
             self.playing = False
         
 
 test=board(2,[False,True], [1, 2])#change this line to control the number of players and which, if any, are AIs
-game=screen(test,450,1000,test.players, None)
+game=screen(test,450,1000, None)
 
 #Code provenance notes:
     #Instructions and code for putting text on the screen were borrowed from
