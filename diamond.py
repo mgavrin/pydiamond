@@ -254,7 +254,7 @@ class player:
         if event.type==KEYDOWN and event.key==K_RETURN:
             if len(self.curMoveChain)>=2: #need at least a start and an end
                 # Actually make the move
-                self.make_move(self.curMoveChain[0], self.curMoveChain[-1])
+                self.board.make_move(self.curMoveChain[0], self.curMoveChain[-1])
                 self.curMoveChain = [] # Empty the move chain
         elif event.type==KEYDOWN and event.key==K_BACKSPACE:
             if len(self.curMoveChain)>0:
@@ -399,7 +399,7 @@ class screen: #the pygame screen and high-level "running the game" stuff
             self.playing = False
         
 
-test=board(2,[False,True], [1, 0])#change this line to control the number of players and which, if any, are AIs
+test=board(2,[False,True], [1, 2])#change this line to control the number of players and which, if any, are AIs
 game=screen(test,450,1000,test.players, None)
 
 #Code provenance notes:
