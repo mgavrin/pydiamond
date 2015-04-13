@@ -35,8 +35,8 @@ class board:
         self.hexagon=hexagon(self)
         if self.numPlayers==2:
             #define players
-            self.player1=player(1,"red",self,self.AIs[0],False)
-            self.player2=player(2,"blue",self,self.AIs[1],False)
+            self.player1=player(1,"red",self.AIs[0],False)
+            self.player2=player(2,"blue",self.AIs[1],False)
             self.players=[self.player1,self.player2]
             #define triangles
             self.top=triangleCorner(self,"top",True,self.player1)
@@ -52,9 +52,9 @@ class board:
             self.player2.startTri=self.bottom
         elif self.numPlayers==3:
             #define players
-            self.player1=player(1,"red",self,self.AIs[0],False)
-            self.player2=player(2,"green",self,self.AIs[1],False)
-            self.player3=player(3,"blue",self,self.AIs[2],False)
+            self.player1=player(1,"red",self.AIs[0],False)
+            self.player2=player(2,"green",self.AIs[1],False)
+            self.player3=player(3,"blue",self.AIs[2],False)
             self.players=[self.player1,self.player2,self.player3]
             #define triangles
             self.top=triangleCorner(self,"top",True,self.player1)
@@ -168,10 +168,8 @@ class board:
         return filter(lambda point: point.contents == player.number, self.allPoints)
       
     def AIMove(self, number):
-        # Get the AI player function to use
-        aip = self.AIs[number - 1]
-        # Run the AI for the current player
-        aip.ai_player(self)
+        # Run the current player's AI
+        self.curPlayer.AI.ai_player(self)
 
 class triangleCorner:
     def __init__(self,board,orientation,inPlay,startPlayer=False):
@@ -246,28 +244,27 @@ class point: #a single position which can hold a piece
             
 
 class player:
-    def __init__(self,number,color,board,AI,networked):
+    def __init__(self,number,color,AI,networked):
         self.number=number
         self.color=color
-        self.board=board
         self.AI=AI
         self.networked = networked # Whether player is on a networked
         # List of point instances in move,
         # starting with initial location of moved piece
         self.curMoveChain=[]
 
-    def useInput(self,event):
+    def useInput(self,board,event):
         if event.type==KEYDOWN and event.key==K_RETURN:
             if len(self.curMoveChain)>=2: #need at least a start and an end
                 # Actually make the move
-                self.board.make_move(self.curMoveChain[0], self.curMoveChain[-1])
+                board.make_move(self.curMoveChain[0], self.curMoveChain[-1])
                 self.curMoveChain = [] # Empty the move chain
         elif event.type==KEYDOWN and event.key==K_BACKSPACE:
             if len(self.curMoveChain)>0:
                 self.curMoveChain=self.curMoveChain[:-1]
         elif event.type==MOUSEBUTTONDOWN:
             pos=event.pos
-            point=self.board.getNearestPoint(pos)
+            point=board.getNearestPoint(pos)
             if not point:
                 return False #click wasn't near any points on the board
             elif len(self.curMoveChain)==0:
@@ -321,7 +318,7 @@ class screen: #the pygame screen and high-level "running the game" stuff
                 self.play_turn(self.board) # Play the turn
                 self.checkWin() # Check if the game is won
             else: # Allow a player to control the game once ended (to quit)
-                self.getInput(self.board.curPlayer)
+                self.getInput(self.board)
             self.drawScreen()
         self.clock.tick(self.fps)
 
@@ -332,12 +329,12 @@ class screen: #the pygame screen and high-level "running the game" stuff
             self.network.get_turn(player)
         # Otherwise if they're a human on the computer
         elif not player.AI:
-            self.getInput(player)
+            self.getInput(board)
         # Otherwise it's an AI
         else:
             board.AIMove(player.number)
 
-    def getInput(self,player):
+    def getInput(self,board):
         events = pygame.event.get()
         for event in events:
             if event.type == QUIT:
@@ -345,7 +342,7 @@ class screen: #the pygame screen and high-level "running the game" stuff
                 break
             else:
                 if self.playing:
-                    player.useInput(event)
+                    board.curPlayer.useInput(board,event)
 
     def drawScreen(self):
         self.gameScreen.fill(self.backgroundColor)
