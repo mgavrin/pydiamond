@@ -1,4 +1,5 @@
 from random import randint
+from copy import copy
 
 class TreeNode:
     def __init__(self, element):
@@ -8,17 +9,27 @@ class TreeNode:
 class AI:
     def __init__(self, difficulty):
         # List of available AIs
-        self.ai_list = [ self.random_ai, self.directional_slide_ai ]
+        self.ai_list = [
+                self.random_ai,
+                self.directional_slide_ai,
+                self.minimax_ai ]
         # Select an AI to use based on dificulty setting
         self.ai_player = self.ai_list[difficulty]
         # A set direction that the AI should move in
         self.set_dir = -1 # disabled to start
 
     """
+    Evaluate the given board state to determine how good it is for the
+    current player.
+    """
+    def evaluate(self, player, board):
+        return 0
+
+    """
     Simple wrapper for the make_move function.
     """
     def make_move(self, player, source, destination):
-        return player.make_move(source, destination)
+        return player.board.make_move(source, destination)
 
     """
     A function that will force the AI to make a random move if its educated move-
@@ -49,9 +60,6 @@ class AI:
                 jumps.append(dest)
                 # Then find all possible jumps from that place
                 for drctn in dest.neighbors:
-                    # Do not check a jump right back
-                    if drctn == opposite(direction):
-                        continue
                     jumps = self.find_jumps(dest, drctn, jumps)
         return jumps
     
@@ -74,7 +82,7 @@ class AI:
     """
     def random_piece(self, player):
         # Find all pieces belonging to the current player
-        player_pieces = filter(lambda point: point.contents == player.number, player.board.allPoints)
+        player_pieces = player.get_pieces()
         # Pick a random piece that has at least one empty neighbour
         piece = None
         while True:
@@ -169,3 +177,57 @@ class AI:
         neighbor = piece.neighbors[directions[choice]]
         # And finally, make the move
         self.final_move(player, piece, neighbor)
+
+    """
+    An AI player that generates a tree of game states and then searches for the
+    move that will have the best outcome further down the line.
+    An element is made of its score value, the move that got it there and the
+    board object that it results in.
+    """
+    def minimax_ai(self, player):
+        # Start the tree with the current game state
+        game_tree = TreeNode({
+            "score": 0,
+            "move": None,
+            "board": player.board })
+        # Then find all possible states leading from it
+        game_tree.children = self.build_tree(player, 2, 0)
+        # Now find the best possible move
+        move = self.find_best(game_tree)
+        # And finally make the move
+        return self.final_move(player, move[0], move[1])
+
+    """
+    Build a tree of all game possibilities up to a certain depth.
+    """
+    def build_tree(self, player, max_depth, depth):
+        # Stop looking at a certain depth
+        if depth >= max_depth:
+            return None
+        moves = []
+        # Find all possible moves the player can make
+        for piece in player.get_pieces():
+            for move in self.possible_moves(piece):
+                moves.append((piece, move))
+        nodes = [] # Tree nodes to return
+        # For every possible move, generate a tree item and keep looking
+        for move in moves:
+            # Get a new board object by copying the old one
+            board = copy(player.board)
+            # Make the move (thus changing player's turn)
+            self.make_move(player, move[0], move[1])
+            # Build a tree node to add to the list of nodes
+            node = TreeNode({
+                "score": self.evaluate(player, board),
+                "move": move,
+                "board": board })
+            # Now look further down the tree
+            node.children = self.build_tree(player, max_depth, depth + 1)
+            nodes.append(node)
+        return nodes
+
+    """
+    Find the best possible move in a game tree.
+    """
+    def find_best(self, game_tree):
+        return game_tree.children[randint(0, len(game_tree.children))].element["move"]
