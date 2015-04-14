@@ -1,5 +1,6 @@
 from random import randint
 from copy import copy
+from time import time
 
 class TreeNode:
     def __init__(self, element):
@@ -45,19 +46,25 @@ class AI:
         self.ai_player = self.ai_list[difficulty]
         # A set direction that the AI should move in
         self.set_dir = -1 # disabled to start
+        # Maximum search time of the AI
+        self.max_time = 1
+        # Time that a move search started
+        self.search_start = 0
 
     """
     Evaluate the given board state to determine how good it is for the
     current player.
     """
     def evaluate(self, player, board):
-        return 0
-
-    """
-    Simple wrapper for the make_move function.
-    """
-    def make_move(self, board, source, destination):
-        return board.make_move(source, destination)
+        score = 0
+        # Find tip of start and end triangles
+        # start_tip = filter(lambda p: len(p.neighbors) == 2, player.startTri.points)[0]
+        end_tip = filter(lambda p: len(p.neighbors) == 2, player.endTri.points)[0]
+        # Give points for all pieces
+        for piece in board.get_pieces(player):
+            score += 500 - abs(end_tip.yPos - piece.yPos)
+            score -= abs(end_tip.xPos - piece.xPos)
+        return score
 
     """
     A function that will force the AI to make a random move if its educated move-
@@ -65,7 +72,7 @@ class AI:
     """
     def final_move(self, board, source, destination):
         # Try making the educated move
-        if self.make_move(board, source, destination):
+        if board.make_move(source, destination):
             return True
         # But fail to a random one
         return self.random_move(board, self.random_piece(board))
@@ -170,9 +177,9 @@ class AI:
                 return self.random_move(board, piece)
             # Otherwise it can move in only one of the two preferred ones,
             # so pick the one that it can move in.
-            return self.make_move(board, piece, piece.neighbors[directions[1]])
+            return board.make_move(piece, piece.neighbors[directions[1]])
         if directions[1] not in piece.neighbors:
-            return self.make_move(board, piece, piece.neighbors[directions[0]])
+            return board.make_move(piece, piece.neighbors[directions[0]])
 
         # If it can move in either direction, try aligning it with the triangle
         if piece.xPos <= 160: # Too far left
@@ -181,7 +188,7 @@ class AI:
             # And try to move it backwards
             drctn = other_dir[self.set_dir]
             if drctn in piece.neighbors and piece.neighbors[drctn].contents == 0 and\
-                    self.make_move(board, piece, piece.neighbors[other_dir[self.set_dir]]):
+                    board.make_move(piece, piece.neighbors[other_dir[self.set_dir]]):
                 return True
 
         elif piece.xPos >= 280: # Too far right
@@ -190,7 +197,7 @@ class AI:
             # And try to move it backwards
             drctn = other_dir[self.set_dir]
             if drctn in piece.neighbors and piece.neighbors[drctn].contents == 0 and\
-                    self.make_move(board, piece, piece.neighbors[other_dir[self.set_dir]]):
+                    board.make_move(piece, piece.neighbors[other_dir[self.set_dir]]):
                 return True
 
         elif piece.xPos == 220: # Piece dead-centre
@@ -212,6 +219,8 @@ class AI:
     board object that it results in.
     """
     def minimax_ai(self, board):
+        # Start search timer
+        self.search_start = time()
         # Start the tree with the current game state
         game_tree = TreeNode({
             "score": 0,
@@ -243,10 +252,13 @@ class AI:
         nodes = [] # Tree nodes to return
         # For every possible move, generate a tree item and keep looking
         for move in moves:
+            # Make sure that the AI does not spend too long searching
+            if time() - self.search_start >= self.max_time:
+                break
             # Get a new board object by copying the old one
             new_board = copy(board)
             # Make the move (thus changing player's turn)
-            self.make_move(new_board, copy(move[0]), copy(move[1]))
+            new_board.make_move(copy(move[0]), copy(move[1]))
             # Build a tree node to add to the list of nodes
             node = TreeNode({
                 "score": self.evaluate(board.curPlayer, new_board),
@@ -265,6 +277,7 @@ class AI:
         # Iterate through all leaves in the tree
         for leaf in game_tree.leaves():
             # Then find the one with the highest score
+            print leaf.element["score"], best.element["score"]
             if leaf.element["score"] > best.element["score"]:
                 best = leaf
         # Then find which branch of the tree contains that option
