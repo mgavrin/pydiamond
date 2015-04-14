@@ -7,10 +7,18 @@ class TreeNode:
         self.children = []
 
     """
-    Find the best game state at the end of a game tree.
+    Return a list of the game tree's leaves
     """
-    def best_leaf(self, curr_max, comparator):
-        return self.children[randint(0, len(self.children))]
+    def leaves(self):
+        # Leaf, so return self
+        if self.children == None:
+            return [self]
+        # Otherwise find every leaf below this one
+        leaves = []
+        for child in self.children:
+            leaves += child.leaves()
+        # Then find the best score of all leaves
+        return leaves
 
     """
     Test whether a tree contains a specific node within it.
@@ -214,9 +222,9 @@ class AI:
         # Now find the best possible move
         self.find_best(game_tree)
         move = game_tree.element["move"]
-        # If we have no move, then make a random one
+        # If we have no move, then make a directional one
         if move == None:
-            return self.random_ai(board)
+            return self.directional_slide_ai(board)
         # And finally make the move
         return self.final_move(board, move[0], move[1])
 
@@ -253,8 +261,13 @@ class AI:
     Find the best possible move in a game tree.
     """
     def find_best(self, game_tree):
-        # Find the best situation to end in
-        best = game_tree.best_leaf(0, lambda x, y: x.element["score"] > y)
+        best = game_tree.children[0]
+        # Iterate through all leaves in the tree
+        for leaf in game_tree.leaves():
+            print leaf
+            # Then find the one with the highest score
+            if leaf.element["score"] > best.element["score"]:
+                best = leaf
         # Then find which branch of the tree contains that option
         for node in game_tree.children:
             if node.contains(best):
