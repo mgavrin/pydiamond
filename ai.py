@@ -102,9 +102,7 @@ class AI:
         # Then pick a random direction to move in
         dest = destinations[randint(0, len(destinations) - 1)]
         # And make the move (it must be possible, but be sure of it)
-        if self.make_move(board, piece, dest):
-            return True
-        return self.random_move(board, piece)
+        return self.final_move(board, piece, dest)
 
     """
     Simply AI that just plays random moves.
