@@ -6,6 +6,18 @@ class TreeNode:
         self.element = element
         self.children = []
 
+    """
+    Find the best game state at the end of a game tree.
+    """
+    def best_leaf(self, curr_max, comparator):
+        return self
+
+    """
+    Test whether a tree contains a specific node within it.
+    """
+    def contains(self, node):
+        return True
+
 class AI:
     def __init__(self, difficulty):
         # List of available AIs
@@ -192,7 +204,8 @@ class AI:
         # Then find all possible states leading from it
         game_tree.children = self.build_tree(board, 3, 0)
         # Now find the best possible move
-        move = self.find_best(game_tree)
+        self.find_best(game_tree)
+        move = game_tree.element["move"]
         # And finally make the move
         return self.final_move(board, move[0], move[1])
 
@@ -212,7 +225,7 @@ class AI:
         # For every possible move, generate a tree item and keep looking
         for move in moves:
             # Get a new board object by copying the old one
-            new_board = board
+            new_board = copy(board)
             # Make the move (thus changing player's turn)
             self.make_move(new_board, copy(move[0]), copy(move[1]))
             # Build a tree node to add to the list of nodes
@@ -229,4 +242,11 @@ class AI:
     Find the best possible move in a game tree.
     """
     def find_best(self, game_tree):
-        return game_tree.children[randint(0, len(game_tree.children) - 1)].element["move"]
+        # Find the best situation to end in
+        best = game_tree.best_leaf(0, lambda x, y: x.element["score"] > y)
+        # Then find which branch of the tree contains that option
+        for node in game_tree.children:
+            if node.contains(best):
+                # And set the move to perform
+                game_tree.element["move"] = node.element["move"]
+                return
