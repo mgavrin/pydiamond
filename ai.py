@@ -1,5 +1,5 @@
 from random import randint
-from copy import copy, deepcopy
+from copy import copy
 
 class TreeNode:
     def __init__(self, element):
@@ -264,7 +264,6 @@ class AI:
         best = game_tree.children[0]
         # Iterate through all leaves in the tree
         for leaf in game_tree.leaves():
-            print leaf
             # Then find the one with the highest score
             if leaf.element["score"] > best.element["score"]:
                 best = leaf
