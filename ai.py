@@ -10,13 +10,21 @@ class TreeNode:
     Find the best game state at the end of a game tree.
     """
     def best_leaf(self, curr_max, comparator):
-        return self
+        return self.children[randint(0, len(self.children))]
 
     """
     Test whether a tree contains a specific node within it.
     """
     def contains(self, node):
-        return True
+        if self == node: # Match
+            return True
+        if self.children == None: # Leaf, no match
+            return False
+        for child in self.children: # Check children
+            if child.contains(node): # Recurse
+                return True
+        # No children contain it so no match
+        return False
 
 class AI:
     def __init__(self, difficulty):
@@ -206,6 +214,9 @@ class AI:
         # Now find the best possible move
         self.find_best(game_tree)
         move = game_tree.element["move"]
+        # If we have no move, then make a random one
+        if move == None:
+            return self.random_ai(board)
         # And finally make the move
         return self.final_move(board, move[0], move[1])
 
