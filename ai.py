@@ -1,5 +1,5 @@
 from random import randint
-from copy import copy
+from copy import copy, deepcopy
 from time import time
 
 class TreeNode:
@@ -47,7 +47,7 @@ class AI:
         # A set direction that the AI should move in
         self.set_dir = -1 # disabled to start
         # Maximum search time of the AI
-        self.max_time = 1
+        self.max_time = 5
         # Time that a move search started
         self.search_start = 0
 
@@ -62,8 +62,10 @@ class AI:
         end_tip = filter(lambda p: len(p.neighbors) == 2, player.endTri.points)[0]
         # Give points for all pieces
         for piece in board.get_pieces(player):
-            score += 500 - abs(end_tip.yPos - piece.yPos)
-            score -= abs(end_tip.xPos - piece.xPos)
+            # Score well for pieces close vertically
+            score += 408 - abs((end_tip.yPos - 34) - piece.yPos)
+            # And close horizontally
+            score += 100 - abs(end_tip.xPos - piece.xPos)
         return score
 
     """
@@ -227,13 +229,18 @@ class AI:
             "move": None,
             "board": board })
         # Then find all possible states leading from it
-        game_tree.children = self.build_tree(board, 3, 0)
+        game_tree.children = self.build_tree(board, 5, 0)
         # Now find the best possible move
         self.find_best(game_tree)
         move = game_tree.element["move"]
         # If we have no move, then make a directional one
         if move == None:
             return self.directional_slide_ai(board)
+        end_tip = filter(lambda p: len(p.neighbors) == 2, board.curPlayer.endTri.points)[0]
+        print "_" * 50
+        print "({}, {})".format(end_tip.xPos, end_tip.yPos)
+        print "({}, {}) -> ({}, {})".format(move[0].xPos, move[0].yPos, move[1].xPos, move[1].yPos)
+        print game_tree.element["score"]
         # And finally make the move
         return self.final_move(board, move[0], move[1])
 
@@ -256,7 +263,7 @@ class AI:
             if time() - self.search_start >= self.max_time:
                 break
             # Get a new board object by copying the old one
-            new_board = copy(board)
+            new_board = deepcopy(board)
             # Make the move (thus changing player's turn)
             new_board.make_move(copy(move[0]), copy(move[1]))
             # Build a tree node to add to the list of nodes
@@ -277,12 +284,13 @@ class AI:
         # Iterate through all leaves in the tree
         for leaf in game_tree.leaves():
             # Then find the one with the highest score
-            print leaf.element["score"], best.element["score"]
             if leaf.element["score"] > best.element["score"]:
                 best = leaf
+            # print leaf.element["score"]
         # Then find which branch of the tree contains that option
         for node in game_tree.children:
             if node.contains(best):
                 # And set the move to perform
                 game_tree.element["move"] = node.element["move"]
+                game_tree.element["score"] = node.element["score"]
                 return
