@@ -1,5 +1,5 @@
 from random import randint
-from copy import deepcopy
+from copy import copy, deepcopy
 
 class TreeNode:
     def __init__(self, element):
@@ -190,7 +190,7 @@ class AI:
             "move": None,
             "board": board })
         # Then find all possible states leading from it
-        game_tree.children = self.build_tree(board, 2, 0)
+        game_tree.children = self.build_tree(board, 3, 0)
         # Now find the best possible move
         move = self.find_best(game_tree)
         # And finally make the move
@@ -212,9 +212,9 @@ class AI:
         # For every possible move, generate a tree item and keep looking
         for move in moves:
             # Get a new board object by copying the old one
-            new_board = deepcopy(board)
+            new_board = board
             # Make the move (thus changing player's turn)
-            self.make_move(new_board, move[0], move[1])
+            self.make_move(new_board, copy(move[0]), copy(move[1]))
             # Build a tree node to add to the list of nodes
             node = TreeNode({
                 "score": self.evaluate(board.curPlayer, new_board),
