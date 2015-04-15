@@ -245,26 +245,24 @@ class player:
         return True
 
     def useInput(self,event):
-        #Disallow user input while game is paused
-        if not self.screen.paused:
-            if event.type==KEYDOWN and event.key==K_RETURN:
-                if len(self.curMoveChain)>=2: #need at least a start and an end
-                    # Actually make the move
-                    self.make_move(self.curMoveChain[0], self.curMoveChain[-1])
-                    self.curMoveChain = [] # Empty the move chain
-            elif event.type==KEYDOWN and event.key==K_BACKSPACE:
-                if len(self.curMoveChain)>0:
-                    self.curMoveChain=self.curMoveChain[:-1]
-            elif event.type==MOUSEBUTTONDOWN:
-                pos=event.pos
-                point=self.board.getNearestPoint(pos)
-                if not point:
-                    return False #click wasn't near any points on the board
-                elif len(self.curMoveChain)==0:
-                    if point.contents==self.number: #have to start with your own point
-                        self.curMoveChain=[point]
-                elif self.curMoveChain[-1].canJumpTo(point,len(self.curMoveChain)==1):
-                    self.curMoveChain.append(point)
+        if event.type==KEYDOWN and event.key==K_RETURN:
+            if len(self.curMoveChain)>=2: #need at least a start and an end
+                # Actually make the move
+                self.make_move(self.curMoveChain[0], self.curMoveChain[-1])
+                self.curMoveChain = [] # Empty the move chain
+        elif event.type==KEYDOWN and event.key==K_BACKSPACE:
+            if len(self.curMoveChain)>0:
+                self.curMoveChain=self.curMoveChain[:-1]
+        elif event.type==MOUSEBUTTONDOWN:
+            pos=event.pos
+            point=self.board.getNearestPoint(pos)
+            if not point:
+                return False #click wasn't near any points on the board
+            elif len(self.curMoveChain)==0:
+                if point.contents==self.number: #have to start with your own point
+                    self.curMoveChain=[point]
+            elif self.curMoveChain[-1].canJumpTo(point,len(self.curMoveChain)==1):
+                self.curMoveChain.append(point)
 
     def passTurn(self):
         self.screen.curPlayer = self.screen.players[self.number%self.board.numPlayers]
