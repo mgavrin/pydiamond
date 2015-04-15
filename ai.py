@@ -248,7 +248,7 @@ class AI:
         print "_" * 50
         print "({}, {})".format(end_tip.xPos, end_tip.yPos)
         print "({}, {}) -> ({}, {})".format(move[0].xPos, move[0].yPos, move[1].xPos, move[1].yPos)
-        print game_tree.element["score"], ":", self.evaluate(board.curPlayer, board)
+        print game_tree.element["score"]
         # And finally make the move
         return self.final_move(board, move[0], move[1])
 
