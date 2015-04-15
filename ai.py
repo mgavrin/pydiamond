@@ -47,7 +47,7 @@ class AI:
         # A set direction that the AI should move in
         self.set_dir = -1 # disabled to start
         # Maximum search time of the AI
-        self.max_time = 5
+        self.max_time = 2
         # Time that a move search started
         self.search_start = 0
 
@@ -57,15 +57,23 @@ class AI:
     """
     def evaluate(self, player, board):
         score = 0
-        # Find tip of start and end triangles
-        # start_tip = filter(lambda p: len(p.neighbors) == 2, player.startTri.points)[0]
+        # Find tip of the end triangles
         end_tip = filter(lambda p: len(p.neighbors) == 2, player.endTri.points)[0]
+        # And get the opponent and the position of its end triangle
+        opponent = board.players[(player.number + 2) % board.numPlayers]
+        opp_end_tip = filter(lambda p: len(p.neighbors) == 2, opponent.endTri.points)[0]
         # Give points for all pieces
         for piece in board.get_pieces(player):
             # Score well for pieces close vertically
             score += 408 - abs((end_tip.yPos - 34) - piece.yPos)
             # And close horizontally
             score += 100 - abs(end_tip.xPos - piece.xPos)
+        # Remove points for how well opponent is doing
+        for piece in board.get_pieces(opponent):
+            # Score well for pieces close vertically
+            score -= (408 - abs((opp_end_tip.yPos - 34) - piece.yPos)) / 2
+            # And close horizontally
+            score -= (100 - abs(opp_end_tip.xPos - piece.xPos)) / 2
         return score
 
     """
@@ -240,7 +248,7 @@ class AI:
         print "_" * 50
         print "({}, {})".format(end_tip.xPos, end_tip.yPos)
         print "({}, {}) -> ({}, {})".format(move[0].xPos, move[0].yPos, move[1].xPos, move[1].yPos)
-        print game_tree.element["score"]
+        print game_tree.element["score"], ":", self.evaluate(board.curPlayer, board)
         # And finally make the move
         return self.final_move(board, move[0], move[1])
 
