@@ -1,4 +1,4 @@
-from random import randint
+from random import randint, shuffle
 from copy import copy, deepcopy
 from time import time
 
@@ -71,9 +71,9 @@ class AI:
         # Remove points for how well opponent is doing
         for piece in board.get_pieces(opponent):
             # Score well for pieces close vertically
-            score -= (408 - abs((opp_end_tip.yPos - 34) - piece.yPos)) / 2
+            score -= 408 - abs((opp_end_tip.yPos - 34) - piece.yPos)
             # And close horizontally
-            score -= (100 - abs(opp_end_tip.xPos - piece.xPos)) / 2
+            score -= 100 - abs(opp_end_tip.xPos - piece.xPos)
         return score
 
     """
@@ -90,22 +90,20 @@ class AI:
     """
     Find all possible jumps that a piece can make by starting in one direction.
     """
-    def find_jumps(self, piece, direction, jumps):
-        # Make sure a jump can be made in this direction
-        if direction in piece.neighbors\
-                and direction in piece.neighbors[direction].neighbors:
-            adjacent = piece.neighbors[direction]
-            dest = adjacent.neighbors[direction]
-            # If there is something to skip over and land in
-            if adjacent.contents != 0 and dest.contents == 0:
+    def find_jumps(self, piece, jumps):
+        for direction in piece.neighbors:
+            if direction in piece.neighbors[direction].neighbors:
+                adjacent = piece.neighbors[direction]
+                dest = adjacent.neighbors[direction]
                 # If the destination is already in the jumps array, return
                 if dest in jumps:
                     return jumps
-                # Add the destination to the possible jumps
-                jumps.append(dest)
-                # Then find all possible jumps from that place
-                for drctn in dest.neighbors:
-                    jumps = self.find_jumps(dest, drctn, jumps)
+                # If there is something to skip over and land in
+                if adjacent.contents != 0 and dest.contents == 0:
+                    # Add the destination to the possible jumps
+                    jumps.append(dest)
+                    # Then find all possible jumps from that place
+                    jumps = self.find_jumps(dest, jumps)
         return jumps
     
     """
@@ -118,8 +116,10 @@ class AI:
             # Add the possible neighbouring moves
             if piece.neighbors[direction].contents == 0:
                 moves.append(piece.neighbors[direction])
-            # And find all possible jumps in that direction
-            moves = self.find_jumps(piece, direction, moves)
+        # And find all possible jumps
+        moves = self.find_jumps(piece, moves)
+        # Randomise the order so moves aren't always exactly the same
+        shuffle(moves)
         return moves
 
     """
@@ -237,7 +237,7 @@ class AI:
             "move": None,
             "board": board })
         # Then find all possible states leading from it
-        game_tree.children = self.build_tree(board, 5, 0)
+        game_tree.children = self.build_tree(board, 1, 0)
         # Now find the best possible move
         self.find_best(game_tree)
         move = game_tree.element["move"]
