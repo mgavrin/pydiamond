@@ -3,6 +3,7 @@ from pygame.locals import *
 import ai
 from ai import AI
 import sys
+import thread
 
 # Instantiate AI objects for each AI player
 def get_AIs(AIs, difficulties):
@@ -313,14 +314,21 @@ class screen: #the pygame screen and high-level "running the game" stuff
         pygame.display.quit()
 
     def mainloop(self):
-        while self.running:
-            if self.playing: # Only allow play when game is not won
-                self.play_turn(self.board) # Play the turn
-                self.checkWin() # Check if the game is won
-            else: # Allow a player to control the game once ended (to quit)
-                self.getInput(self.board)
-            self.drawScreen()
+        # Run game logic in a separate thread
+        thread.start_new_thread(self.play, ())
+        # Run the display loop
+        self.display()
         self.clock.tick(self.fps)
+
+    def play(self):
+        while self.running and self.playing:
+            self.play_turn(self.board)
+            self.checkWin()
+
+    def display(self):
+        while self.running:
+            self.drawScreen()
+            self.getInput(self.board)
 
     def play_turn(self, board):
         player = board.curPlayer
@@ -339,9 +347,11 @@ class screen: #the pygame screen and high-level "running the game" stuff
         for event in events:
             if event.type == QUIT:
                 self.running=False
+                self.playing=False
                 break
             else:
-                if self.playing:
+                # If it's a human player's turn, accept their input
+                if self.playing and not board.curPlayer.AI:
                     board.curPlayer.useInput(board,event)
 
     def drawScreen(self):
