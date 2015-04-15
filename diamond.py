@@ -3,7 +3,7 @@ from pygame.locals import *
 import ai
 from ai import AI
 import sys
-import thread
+from threading import Thread
 
 # Instantiate AI objects for each AI player
 def get_AIs(AIs, difficulties):
@@ -314,17 +314,31 @@ class screen: #the pygame screen and high-level "running the game" stuff
         pygame.display.quit()
 
     def mainloop(self):
-        # Run game logic in a separate thread
-        thread.start_new_thread(self.play, ())
-        # Run the display loop
-        self.display()
-        self.clock.tick(self.fps)
+        try:
+            # Run game logic in a separate thread
+            t = Thread(target = self.update)
+            t.start()
+            # Run the display loop
+            self.display()
+        except KeyboardInterrupt:
+            # Stop the game if interrupted
+            self.running = False
+            print "\nBye"
+        except:
+            # Stop the game if an error happens
+            self.running = False
+            # Raise the exception
+            raise
 
-    def play(self):
+    # Game update, handles AI and input
+    def update(self):
         while self.running and self.playing:
             self.play_turn(self.board)
             self.checkWin()
+            # Maintain update rate to FPS
+            self.clock.tick(self.fps)
 
+    # Display updating, handles display and input
     def display(self):
         while self.running:
             self.drawScreen()
