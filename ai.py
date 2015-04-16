@@ -245,10 +245,10 @@ class AI:
         if move == None:
             return self.directional_slide_ai(board)
         end_tip = filter(lambda p: len(p.neighbors) == 2, board.curPlayer.endTri.points)[0]
-        print "_" * 50
-        print "({}, {})".format(end_tip.xPos, end_tip.yPos)
-        print "({}, {}) -> ({}, {})".format(move[0].xPos, move[0].yPos, move[1].xPos, move[1].yPos)
-        print game_tree.element["score"]
+        # print "_" * 50
+        # print "({}, {})".format(end_tip.xPos, end_tip.yPos)
+        # print "({}, {}) -> ({}, {})".format(move[0].xPos, move[0].yPos, move[1].xPos, move[1].yPos)
+        # print game_tree.element["score"]
         # And finally make the move
         return self.final_move(board, move[0], move[1])
 
@@ -294,7 +294,6 @@ class AI:
             # Then find the one with the highest score
             if leaf.element["score"] > best.element["score"]:
                 best = leaf
-            # print leaf.element["score"]
         # Then find which branch of the tree contains that option
         for node in game_tree.children:
             if node.contains(best):

@@ -32,6 +32,9 @@ class board:
             print "Badly formatted board init: please specify difficulty for each player (even non-AIs)."
         if not(2<=numPlayers and numPlayers<=3):
             print "Badly formatted init: please specifiy either 2 players or 3 players."
+        # Keep track of move history
+        self.moves = []
+        # Dictionary of point coordinates to objects
         self.pointPositions={}
         self.hexagon=hexagon(self)
         if self.numPlayers==2:
@@ -152,6 +155,10 @@ class board:
         else:
             return False
 
+    # Get a point at the given coordinates on the board
+    def get_point(self, pos):
+        return self.pointPositions[(pos[0], pos[1])]
+
     # Make a move given source and destination points
     def make_move(self, source, destination):
         # Make sure move can be made
@@ -160,6 +167,9 @@ class board:
         # Move the piece to the empty space
         destination.contents = source.contents
         source.contents = 0
+        # Keep the move in the move history
+        self.moves.append(((source.xPos, source.yPos),
+                          (destination.xPos, destination.yPos)))
         # Change turn
         self.curPlayer = self.players[self.curPlayer.number % self.numPlayers]
         return True
@@ -245,11 +255,11 @@ class point: #a single position which can hold a piece
             
 
 class player:
-    def __init__(self,number,color,AI,networked):
+    def __init__(self,number,color,AI,remote):
         self.number=number
         self.color=color
         self.AI=AI
-        self.networked = networked # Whether player is on a networked
+        self.remote = remote # Whether player is local or remote
         # List of point instances in move,
         # starting with initial location of moved piece
         self.curMoveChain=[]
@@ -281,12 +291,41 @@ class player:
         #If you press Enter without having selected a valid move, nothing will happen.
 
 class Network:
-    def __init__(self, host, ip_addr):
-        self.host = host
-        self.ip = ip_addr
+    def __init__(self, socket):
+        # Socket to read to and write from
+        self.socket = socket
+        # Message length to be receiving
+        self.mess_len = len("xo,yo:xt,yt")
     
-    def get_turn(self, player):
-        pass
+    # If something fails at any point here, nothing can be done, so let it
+    def get_turn(self, board):
+        # Receive a move from the socket
+        msg = self.socket.recv(self.mess_len1)
+        # Get parts out of message
+        parts = move.split(":")
+        origin = parts[0].split(",")
+        target = parts[1].split(",")
+        # Then convert them to ints
+        origin[0] = int(origin[0])
+        origin[1] = int(origin[1])
+        target[0] = int(target[0])
+        target[1] = int(target[1])
+        # Get the source and destination points
+        source = board.get_point(origin)
+        destination = board.get_point(target)
+        # Then make the move
+        board.make_move(source, destination)
+
+    def send_turn(self, move):
+        # Turn the move into a string
+        msg = "{},{}:{},{}".format(\
+                move[0][0], move[0][1],\
+                move[1][0], move[1][1])
+        # Send the message over the socket
+        self.socket.sendall(msg)
+
+    def close(self):
+        self.socket.close()
 
 class screen: #the pygame screen and high-level "running the game" stuff
     def __init__(self,board,xDim,yDim,network):
@@ -345,16 +384,19 @@ class screen: #the pygame screen and high-level "running the game" stuff
             self.getInput(self.board)
 
     def play_turn(self, board):
-        player = board.curPlayer
-        # If the player is connected by networked
-        if player.networked:
-            self.network.get_turn(player)
-        # Otherwise if they're a human on the computer
-        elif not player.AI:
-            self.getInput(board)
-        # Otherwise it's an AI
+        # If the current player is not remote
+        if not board.curPlayer.remote:
+            if board.curPlayer.AI: # AI
+                board.AIMove(board.curPlayer.number)
+            else: # Human
+                self.getInput(board)
+        # Otherwise get the turn from the network
         else:
-            board.AIMove(player.number)
+            self.network.get_turn(board)
+        # If the game is networked and the player is local
+        if self.network != None and not board.curPlayer.remote:
+            # Then we need to send the remote player the move
+            self.network.send_turn(board.moves[-1])
 
     def getInput(self,board):
         events = pygame.event.get()
