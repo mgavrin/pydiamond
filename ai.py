@@ -41,6 +41,7 @@ class AI:
         self.ai_list = [
                 self.random_ai,
                 self.directional_slide_ai,
+                self.naive_maximizer_ai,
                 self.minimax_ai ]
         # Select an AI to use based on dificulty setting
         self.ai_player = self.ai_list[difficulty]
@@ -107,7 +108,8 @@ class AI:
         return jumps
     
     """
-    Find all possible moves a piece can make.
+    Find all possible moves a piece can make and return them as
+    a list of point instances reachable from the start point.
     """
     def possible_moves(self, piece):
         moves = []
@@ -221,6 +223,68 @@ class AI:
         neighbor = piece.neighbors[directions[choice]]
         # And finally, make the move
         self.final_move(board, piece, neighbor)
+
+    """
+    An AI player that moves the piece farthest from the end triangle
+    as far toward the end triangle as possible. Ignores the opponent's moves,
+    but tries to keep its own pieces together which should help with jumps.
+    """
+    def naive_maximizer_ai(self,board):
+        player=board.curPlayer
+        score = 0
+        # Find tip of the end triangles
+        end_tip = filter(lambda p: len(p.neighbors) == 2, player.endTri.points)[0]
+        # Give points for all pieces
+        farthest_piece=board.get_pieces(player)[0]
+        farthest_dist=-1
+        moves=[]
+        for piece in board.get_pieces(player):
+            horizOkay=(moves==[])
+            if len(self.possible_moves(piece))>0 and self.has_useful_moves(piece,player,horizOkay):
+                cur_dist=abs((end_tip.yPos - 34) - piece.yPos)#vertical distance
+                cur_dist+=abs(end_tip.xPos - piece.xPos) #plus horizontal distance
+                if cur_dist>farthest_dist:
+                    farthest_piece=piece
+                    farthest_dist=cur_dist
+                    moves=self.possible_moves(farthest_piece)
+        if moves==[]: #no good or neutral moves, take the least bad move
+            print "shenanigans!"
+            return self.random_ai(board)
+##            for piece in board.get_pieces(player):
+##                if len(self.possible_moves(piece))>0:
+##                    cur_dist=abs((end_tip.yPos - 34) - piece.yPos)#vertical distance
+##                    cur_dist+=abs(end_tip.xPos - piece.xPos) #plus horizontal distance
+##                    if cur_dist>farthest_dist:
+##                        farthest_piece=piece
+##                        farthest_dist=cur_dist
+##                        moves=self.possible_moves(farthest_piece)
+        best_move=moves[0]
+        best_score=-10000
+        for move in moves:
+            cur_dist=abs((end_tip.yPos - 34) - piece.yPos)#vertical distance
+            cur_dist+=abs(end_tip.xPos - piece.xPos) #plus horizontal distance
+            post_move_dist=abs((end_tip.yPos - 34) - move.yPos)#vertical distance
+            post_move_dist+=abs(end_tip.xPos - move.xPos) #plus horizontal distance
+            new_score=cur_dist-post_move_dist
+            if new_score>best_score:
+                best_move=move
+                best_score=new_score
+        return self.final_move(board,farthest_piece,best_move)
+
+    """
+    Returns true iff any of the piece's moves bring it strictly closer to the end
+    """
+    def has_useful_moves(self,piece,player,horizOkay):
+        end_tip = filter(lambda p: len(p.neighbors) == 2, player.endTri.points)[0]
+        for move in self.possible_moves(piece):
+            cur_dist=abs((end_tip.yPos - 34) - piece.yPos)#vertical distance
+            cur_dist+=abs(end_tip.xPos - piece.xPos) #plus horizontal distance
+            post_move_dist=abs((end_tip.yPos - 34) - move.yPos)#vertical distance
+            post_move_dist+=abs(end_tip.xPos - move.xPos) #plus horizontal distance
+            if post_move_dist<cur_dist or (post_move_dist==cur_dist and horizOkay):
+                return True
+        return False
+            
 
     """
     An AI player that generates a tree of game states and then searches for the
