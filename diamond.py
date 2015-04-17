@@ -308,9 +308,11 @@ class player:
         #If you press Enter without having selected a valid move, nothing will happen.
 
 class Network:
-    def __init__(self, socket):
+    def __init__(self, socket, player_num):
         # Socket to read to and write from
         self.socket = socket
+        # Local player's player number
+        self.number = player_num
         # Message length to be receiving
         self.mess_len = len("xo,yo:xt,yt")
     
@@ -348,6 +350,10 @@ class screen: #the pygame screen and high-level "running the game" stuff
     def __init__(self,board,xDim,yDim,network):
         self.board=board
         self.network = network # Can play a networked game
+        if self.network != None:
+            # Set the board's local and remote players
+            self.board.players[network.number - 1].remote = False
+            self.board.players[network.number % self.board.numPlayers].remote = True
         # Graphics related things
         self.xDim=xDim
         self.yDim=yDim
@@ -519,8 +525,8 @@ class screen: #the pygame screen and high-level "running the game" stuff
             self.playing = False
         
 #change this line to control the number of players, which, if any, are AIs, and the AI difficulties
-test=board(2,[True,True], [2, 2])
-game=screen(test,450,1000, None)
+# test=board(2,[True,True], [2, 2])
+# game=screen(test,450,1000, None)
 
 #Code provenance notes:
     #Instructions and code for putting text on the screen were borrowed from
