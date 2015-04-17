@@ -303,12 +303,16 @@ class Network:
         # Local player's player number
         self.number = player_num
         # Message length to be receiving
-        self.mess_len = len("xo,yo:xt,yt")
+        self.mess_len = len("0xo,0yo:0xt,0yt")
     
     # If something fails at any point here, nothing can be done, so let it
     def get_turn(self, board):
         # Receive a move from the socket
         msg = self.socket.recv(self.mess_len)
+        # Exit if too-short message received
+        if len(msg) < self.mess_len:
+            print "Opponent exited."
+            sys.exit(0)
         # Get parts out of message
         parts = msg.split(":")
         origin = parts[0].split(",")
@@ -325,15 +329,12 @@ class Network:
         board.make_move(source, destination)
 
     def send_turn(self, move):
-        # Turn the move into a string
-        msg = "{},{}:{},{}".format(\
+        # Turn the move into a string and pad numbers
+        msg = "{0:03d},{1:03d}:{2:03d},{3:03d}".format(\
                 move[0][0], move[0][1],\
                 move[1][0], move[1][1])
         # Send the message over the socket
         self.socket.sendall(msg)
-
-    def close(self):
-        self.socket.close()
 
 class screen: #the pygame screen and high-level "running the game" stuff
     def __init__(self,board,xDim,yDim,network):
@@ -386,39 +387,44 @@ class screen: #the pygame screen and high-level "running the game" stuff
 
     # Game update, handles AI and input
     def update(self):
-        curr_player = self.board.curPlayer
         while self.running and self.playing:
             self.play_turn(self.board)
             self.checkWin()
-            # When it's the other player's turn, update turn time
-            if self.board.curPlayer != curr_player:
-                self.turnTimeTaken = 0
-                curr_player = self.board.curPlayer
             # Maintain update rate to FPS
             self.clock.tick(self.fps)
 
     # Display updating, handles display and input
     def display(self):
+        curr_player = self.board.curPlayer
         while self.running:
             self.drawScreen()
             self.getInput(self.board)
+            # When it's the other player's turn, update turn time
+            # if self.board.curPlayer != curr_player:
+            #     self.turnTimeTaken = 0
+            #     curr_player = self.board.curPlayer
             #Handle time outs during player turns
-            self.turnTimeTaken += self.clock.get_time() #Increment the turn timer
-            if self.turnTimeTaken > self.maximumTurnTime:
-                self.board.passTurn()
+            # self.turnTimeTaken += self.clock.get_time() #Increment the turn timer
+            # print self.turnTimeTaken
+            # if self.turnTimeTaken > self.maximumTurnTime:
+            #     self.board.passTurn()
 
     def play_turn(self, board):
+        player = board.curPlayer
         # If the current player is not remote
-        if not board.curPlayer.remote:
-            if board.curPlayer.AI: # AI
-                board.AIMove(board.curPlayer.number)
+        if not player.remote:
+            if player.AI: # AI
+                board.AIMove(player.number)
             else: # Human
                 self.getInput(board)
+            # Wait until a turn was actually recognised before going further
+            while board.curPlayer == player:
+                pass
         # Otherwise get the turn from the network
         else:
             self.network.get_turn(board)
         # If the game is networked and the player is local
-        if self.network != None and not board.curPlayer.remote:
+        if self.network != None and not player.remote:
             # Then we need to send the remote player the move
             self.network.send_turn(board.moves[-1])
 
@@ -439,8 +445,10 @@ class screen: #the pygame screen and high-level "running the game" stuff
                 elif event.key == pygame.K_p:
                     self.paused = not self.paused
             else:
-                # If it's a human player's turn, accept their input
-                if self.playing and not board.curPlayer.AI:
+                # If it's a human non-remote player's turn, accept their input
+                if self.playing and\
+                        not board.curPlayer.AI and\
+                        not board.curPlayer.remote:
                     board.curPlayer.useInput(event, board, self.paused)
 
     def saveGame(self):
