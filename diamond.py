@@ -297,10 +297,6 @@ class player:
                 elif self.curMoveChain[-1].canJumpTo(point,len(self.curMoveChain)==1):
                     self.curMoveChain.append(point)
 
-    def passTurn(self):
-        self.screen.curPlayer = self.screen.players[self.number%self.board.numPlayers]
-        self.screen.turnTimeTaken = 0
-
     #Current intended move procedure: click the piece you want to move,
         #then click each circle on your path, then press enter when you're done.
         #If you click somewhere wrong, press backspace to undo it.
@@ -405,7 +401,8 @@ class screen: #the pygame screen and high-level "running the game" stuff
             #Handle time outs during player turns
             self.turnTimeTaken += self.clock.get_time() #Increment the turn timer
             if self.turnTimeTaken > self.maximumTurnTime:
-                self.curPlayer.passTurn()
+                self.board.curPlayer = self.board.players[self.board.curPlayer.number%self.board.numPlayers]
+                self.turnTimeTaken = 0
 
     def play_turn(self, board):
         # If the current player is not remote
@@ -521,6 +518,9 @@ class screen: #the pygame screen and high-level "running the game" stuff
 #change this line to control the number of players, which, if any, are AIs, and the AI difficulties
 test=board(2,[True,True], [0,2])
 game=screen(test,450,1000, None)
+game.mainloop() #this has to be the last thing before exit,
+#because it isn't supposed to terminate until you end the session
+pygame.display.quit()
 
 #Code provenance notes:
     #Instructions and code for putting text on the screen were borrowed from
