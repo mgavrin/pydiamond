@@ -3,17 +3,6 @@ from pygame.locals import *
 import ai
 from ai import AI
 import sys
-from threading import Thread
-
-# Instantiate AI objects for each AI player
-def get_AIs(AIs, difficulties):
-    ai_list = []
-    for ai in AIs:
-        if ai:
-            ai_list.append(AI(difficulties[AIs.index(ai)]))
-        else:
-            ai_list.append(None)
-    return ai_list
 
 #The board and its components
 class board:
@@ -32,15 +21,12 @@ class board:
             print "Badly formatted board init: please specify difficulty for each player (even non-AIs)."
         if not(2<=numPlayers and numPlayers<=3):
             print "Badly formatted init: please specifiy either 2 players or 3 players."
-        # Keep track of move history
-        self.moves = []
-        # Dictionary of point coordinates to objects
         self.pointPositions={}
         self.hexagon=hexagon(self)
         if self.numPlayers==2:
             #define players
-            self.player1=player(1,"red",self.AIs[0],False)
-            self.player2=player(2,"blue",self.AIs[1],False)
+            self.player1=player(1,"red",self,self.AIs[0],False)
+            self.player2=player(2,"blue",self,self.AIs[1],False)
             self.players=[self.player1,self.player2]
             #define triangles
             self.top=triangleCorner(self,"top",True,self.player1)
@@ -56,9 +42,9 @@ class board:
             self.player2.startTri=self.bottom
         elif self.numPlayers==3:
             #define players
-            self.player1=player(1,"red",self.AIs[0],False)
-            self.player2=player(2,"green",self.AIs[1],False)
-            self.player3=player(3,"blue",self.AIs[2],False)
+            self.player1=player(1,"red",self,self.AIs[0],False)
+            self.player2=player(2,"green",self,self.AIs[1],False)
+            self.player3=player(3,"blue",self,self.AIs[2],False)
             self.players=[self.player1,self.player2,self.player3]
             #define triangles
             self.top=triangleCorner(self,"top",True,self.player1)
@@ -74,7 +60,6 @@ class board:
             self.player2.endTri=self.lowerRight
             self.player3.startTri=self.lowerRight
             self.player3.endTri=self.top
-        self.curPlayer = self.players[0]
         #collect and populate triangles
         self.triangles=[self.top,self.bottom,self.upperLeft,self.upperRight,self.lowerLeft,self.lowerRight]
         for triangle in self.triangles:
@@ -155,32 +140,15 @@ class board:
         else:
             return False
 
-    # Get a point at the given coordinates on the board
-    def get_point(self, pos):
-        return self.pointPositions[(pos[0], pos[1])]
-
-    # Make a move given source and destination points
-    def make_move(self, source, destination):
-        # Make sure move can be made
-        if source.contents == 0 or destination.contents != 0:
-            return False
-        # Move the piece to the empty space
-        destination.contents = source.contents
-        source.contents = 0
-        # Keep the move in the move history
-        self.moves.append(((source.xPos, source.yPos),
-                          (destination.xPos, destination.yPos)))
-        # Change turn
-        self.curPlayer = self.players[self.curPlayer.number % self.numPlayers]
-        return True
-                
-    # Get all pieces belonging to the given player
-    def get_pieces(self, player):
-        return filter(lambda point: point.contents == player.number, self.allPoints)
-      
-    def AIMove(self, number):
-        # Run the current player's AI
-        self.curPlayer.AI.ai_player(self)
+# Instantiate AI objects for each AI player
+def get_AIs(AIs, difficulties):
+    ai_list = []
+    for ai in AIs:
+        if ai:
+            ai_list.append(AI(difficulties[AIs.index(ai)]))
+        else:
+            ai_list.append(None)
+    return ai_list
 
 class triangleCorner:
     def __init__(self,board,orientation,inPlay,startPlayer=False):
@@ -255,15 +223,16 @@ class point: #a single position which can hold a piece
             
 
 class player:
-    def __init__(self,number,color,AI,remote):
+    def __init__(self,number,color,board,AI,networked):
         self.number=number
         self.color=color
+        self.board=board
         self.AI=AI
-        self.remote = remote # Whether player is local or remote
+        self.networked = networked # Whether player is on a networked
         # List of point instances in move,
         # starting with initial location of moved piece
         self.curMoveChain=[]
-
+      
     def make_move(self, source, destination):
         # Make sure move can be made
         if source.contents == 0 or destination.contents != 0:
@@ -276,26 +245,24 @@ class player:
         return True
 
     def useInput(self,event):
-        #Disallow user input while game is paused
-        if not self.screen.paused:
-            if event.type==KEYDOWN and event.key==K_RETURN:
-                if len(self.curMoveChain)>=2: #need at least a start and an end
-                    # Actually make the move
-                    self.make_move(self.curMoveChain[0], self.curMoveChain[-1])
-                    self.curMoveChain = [] # Empty the move chain
-            elif event.type==KEYDOWN and event.key==K_BACKSPACE:
-                if len(self.curMoveChain)>0:
-                    self.curMoveChain=self.curMoveChain[:-1]
-            elif event.type==MOUSEBUTTONDOWN:
-                pos=event.pos
-                point=self.board.getNearestPoint(pos)
-                if not point:
-                    return False #click wasn't near any points on the board
-                elif len(self.curMoveChain)==0:
-                    if point.contents==self.number: #have to start with your own point
-                        self.curMoveChain=[point]
-                elif self.curMoveChain[-1].canJumpTo(point,len(self.curMoveChain)==1):
-                    self.curMoveChain.append(point)
+        if event.type==KEYDOWN and event.key==K_RETURN:
+            if len(self.curMoveChain)>=2: #need at least a start and an end
+                # Actually make the move
+                self.make_move(self.curMoveChain[0], self.curMoveChain[-1])
+                self.curMoveChain = [] # Empty the move chain
+        elif event.type==KEYDOWN and event.key==K_BACKSPACE:
+            if len(self.curMoveChain)>0:
+                self.curMoveChain=self.curMoveChain[:-1]
+        elif event.type==MOUSEBUTTONDOWN:
+            pos=event.pos
+            point=self.board.getNearestPoint(pos)
+            if not point:
+                return False #click wasn't near any points on the board
+            elif len(self.curMoveChain)==0:
+                if point.contents==self.number: #have to start with your own point
+                    self.curMoveChain=[point]
+            elif self.curMoveChain[-1].canJumpTo(point,len(self.curMoveChain)==1):
+                self.curMoveChain.append(point)
 
     def passTurn(self):
         self.screen.curPlayer = self.screen.players[self.number%self.board.numPlayers]
@@ -306,51 +273,30 @@ class player:
         #If you click somewhere wrong, press backspace to undo it.
         #If you click somewhere illegal, nothing will happen.
         #If you press Enter without having selected a valid move, nothing will happen.
+                
+    def AIMove(self, number):
+        # Get the AI player function to use
+        aip = self.board.AIs[number - 1]
+        # Run the AI for the current player
+        aip.ai_player(self)
 
 class Network:
-    def __init__(self, socket):
-        # Socket to read to and write from
-        self.socket = socket
-        # Message length to be receiving
-        self.mess_len = len("xo,yo:xt,yt")
+    def __init__(self, host, ip_addr):
+        self.host = host
+        self.ip = ip_addr
     
-    # If something fails at any point here, nothing can be done, so let it
-    def get_turn(self, board):
-        # Receive a move from the socket
-        msg = self.socket.recv(self.mess_len1)
-        # Get parts out of message
-        parts = move.split(":")
-        origin = parts[0].split(",")
-        target = parts[1].split(",")
-        # Then convert them to ints
-        origin[0] = int(origin[0])
-        origin[1] = int(origin[1])
-        target[0] = int(target[0])
-        target[1] = int(target[1])
-        # Get the source and destination points
-        source = board.get_point(origin)
-        destination = board.get_point(target)
-        # Then make the move
-        board.make_move(source, destination)
-
-    def send_turn(self, move):
-        # Turn the move into a string
-        msg = "{},{}:{},{}".format(\
-                move[0][0], move[0][1],\
-                move[1][0], move[1][1])
-        # Send the message over the socket
-        self.socket.sendall(msg)
-
-    def close(self):
-        self.socket.close()
+    def get_turn(self, player):
+        pass
 
 class screen: #the pygame screen and high-level "running the game" stuff
-    def __init__(self,board,xDim,yDim,network):
+    def __init__(self,board,xDim,yDim,players,network):
         self.board=board
-        self.network = network # Can play a networked game
-        # Graphics related things
         self.xDim=xDim
         self.yDim=yDim
+        self.players=players
+        for player in self.players:
+            player.screen=self
+        self.network = network # Can play a networked game
         pygame.init()
         self.background=pygame.image.load("blank background.png")
         self.gameScreen=pygame.display.set_mode((xDim,yDim),0,32)
@@ -362,6 +308,7 @@ class screen: #the pygame screen and high-level "running the game" stuff
         self.instructions=["Click the piece you want to move,","then each space in its path.","Press Enter when you are finished.","Press Backspace to undo a click."]
         for i in range(0,len(self.instructions)):
             self.gameScreen.blit(self.font.render(self.instructions[i], True, (0,0,255)), (20, 450+30*i))
+        self.curPlayer=self.players[0] #the player whose turn it is
         self.running=True #the game has not been quit
         self.playing=True # The game has not been won
         self.winMessage=""#nobody has won yet
@@ -373,61 +320,35 @@ class screen: #the pygame screen and high-level "running the game" stuff
         pygame.display.quit()
 
     def mainloop(self):
-        try:
-            # Run game logic in a separate thread
-            t = Thread(target = self.update)
-            t.start()
-            # Run the display loop
-            self.display()
-        except KeyboardInterrupt:
-            # Stop the game if interrupted
-            self.running = False
-            print "\nBye"
-        except:
-            # Stop the game if an error happens
-            self.running = False
-            # Raise the exception
-            raise
-
-    # Game update, handles AI and input
-    def update(self):
-        while self.running and self.playing:
-            self.play_turn(self.board)
-            self.checkWin()
-            # Maintain update rate to FPS
-            self.clock.tick(self.fps)
-
-    # Display updating, handles display and input
-    def display(self):
         while self.running:
+            if self.playing: # Only allow play when game is not won
+                self.play_turn(self.curPlayer) # Play the turn
+                self.checkWin() # Check if the game is won
+            else: # Allow a player to control the game once ended (to quit)
+                self.getInput(self.curPlayer)
             self.drawScreen()
-            self.getInput(self.board)
             #Handle time outs during player turns
             self.turnTimeTaken += self.clock.get_time() #Increment the turn timer
             if self.turnTimeTaken > self.maximumTurnTime:
                 self.curPlayer.passTurn()
+        self.clock.tick(self.fps)
 
-    def play_turn(self, board):
-        # If the current player is not remote
-        if not board.curPlayer.remote:
-            if board.curPlayer.AI: # AI
-                board.AIMove(board.curPlayer.number)
-            else: # Human
-                self.getInput(board)
-        # Otherwise get the turn from the network
+    def play_turn(self, player):
+        # If the player is connected by networked
+        if player.networked:
+            self.network.get_turn(self.player)
+        # Otherwise if they're a human on the computer
+        elif not player.AI:
+            self.getInput(player)
+        # Otherwise it's an AI
         else:
-            self.network.get_turn(board)
-        # If the game is networked and the player is local
-        if self.network != None and not board.curPlayer.remote:
-            # Then we need to send the remote player the move
-            self.network.send_turn(board.moves[-1])
+            player.AIMove(player.number)
 
-    def getInput(self,board):
+    def getInput(self,player):
         events = pygame.event.get()
         for event in events:
             if event.type == QUIT:
                 self.running=False
-                self.playing=False
                 break
             #Save/load the game
             if event.type == KEYUP:
@@ -439,9 +360,8 @@ class screen: #the pygame screen and high-level "running the game" stuff
                 elif event.key == pygame.K_p:
                     self.paused = not self.paused
             else:
-                # If it's a human player's turn, accept their input
-                if self.playing and not board.curPlayer.AI:
-                    board.curPlayer.useInput(board,event)
+                if self.playing:
+                    player.useInput(event)
 
     def saveGame(self):
         f = open('save.dat', 'w')
@@ -482,28 +402,28 @@ class screen: #the pygame screen and high-level "running the game" stuff
             adjacent=point.neighbors.values()
             for p in adjacent:
                 pygame.draw.line(self.gameScreen, (0,0,0), point.pos, p.pos, 1)
-        for point in self.board.curPlayer.curMoveChain:
+        for point in self.curPlayer.curMoveChain:
             pygame.draw.circle(self.gameScreen,(0,0,255),point.pos,12,3) #black border
         for i in range(0,len(self.instructions)):
             self.gameScreen.blit(self.font.render(self.instructions[i], True, (0,0,255)), (20, 450+30*i))
-        self.gameScreen.blit(self.font.render("Current player: "+str(self.board.curPlayer.number), True, (0,0,255)), (20, 10))
+        self.gameScreen.blit(self.font.render("Current player: "+str(self.curPlayer.number), True, (0,0,255)), (20, 10))
         self.gameScreen.blit(self.font.render(self.winMessage, True, (0,0,255)), (20, 40))
         pygame.display.flip()
 
     def checkWin(self):
         p1Win=True
         p2Win=True
-        for point in self.board.players[0].endTri.points:
+        for point in self.players[0].endTri.points:
             if point.contents!=1:
                 p1Win=False
                 break
-        for point in self.board.players[1].endTri.points:
+        for point in self.players[1].endTri.points:
             if point.contents!=2:
                 p2Win=False
                 break
-        if len(self.board.players)==3:
+        if len(self.players)==3:
             p3Win=True
-            for point in self.board.players[2].endTri.points:
+            for point in self.players[2].endTri.points:
                 if point.contents!=3:
                     p3Win=False
                     break
@@ -514,13 +434,13 @@ class screen: #the pygame screen and high-level "running the game" stuff
         if p2Win:
             self.winMessage+="Player 2 wins! "
             self.playing = False
-        if len(self.board.players)==3 and p3Win:
+        if len(self.players)==3 and p3Win:
             self.winMessage+="Player 3 wins!"
             self.playing = False
         
-#change this line to control the number of players, which, if any, are AIs, and the AI difficulties
-test=board(2,[True,True], [2, 2])
-game=screen(test,450,1000, None)
+
+test=board(2,[False,False], [1, 1])#change this line to control the number of players and which, if any, are AIs
+game=screen(test,450,1000,test.players, None)
 
 #Code provenance notes:
     #Instructions and code for putting text on the screen were borrowed from
