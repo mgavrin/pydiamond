@@ -310,7 +310,7 @@ class Network:
         # Receive a move from the socket
         msg = self.socket.recv(self.mess_len)
         # Get parts out of message
-        parts = move.split(":")
+        parts = msg.split(":")
         origin = parts[0].split(",")
         target = parts[1].split(",")
         # Then convert them to ints
