@@ -275,9 +275,9 @@ class player:
         self.passTurn()
         return True
 
-    def useInput(self,event):
+    def useInput(self, event, paused):
         #Disallow user input while game is paused
-        if not self.screen.paused:
+        if not paused:
             if event.type==KEYDOWN and event.key==K_RETURN:
                 if len(self.curMoveChain)>=2: #need at least a start and an end
                     # Actually make the move
@@ -447,7 +447,7 @@ class screen: #the pygame screen and high-level "running the game" stuff
             else:
                 # If it's a human player's turn, accept their input
                 if self.playing and not board.curPlayer.AI:
-                    board.curPlayer.useInput(board,event)
+                    board.curPlayer.useInput(event, self.paused)
 
     def saveGame(self):
         f = open('save.dat', 'w')
