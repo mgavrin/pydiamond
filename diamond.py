@@ -158,6 +158,10 @@ class board:
     # Get a point at the given coordinates on the board
     def get_point(self, pos):
         return self.pointPositions[(pos[0], pos[1])]
+                
+    # Get all pieces belonging to the given player
+    def get_pieces(self, player):
+        return filter(lambda point: point.contents == player.number, self.allPoints)
 
     # Make a move given source and destination points
     def make_move(self, source, destination):
@@ -171,12 +175,12 @@ class board:
         self.moves.append(((source.xPos, source.yPos),
                           (destination.xPos, destination.yPos)))
         # Change turn
-        self.curPlayer = self.players[self.curPlayer.number % self.numPlayers]
+        self.passTurn()
         return True
-                
-    # Get all pieces belonging to the given player
-    def get_pieces(self, player):
-        return filter(lambda point: point.contents == player.number, self.allPoints)
+
+    # Pass a player's turn
+    def passTurn(self):
+        self.curPlayer = self.players[self.curPlayer.number % self.numPlayers]
       
     def AIMove(self, number):
         # Run the current player's AI
@@ -264,24 +268,13 @@ class player:
         # starting with initial location of moved piece
         self.curMoveChain=[]
 
-    def make_move(self, source, destination):
-        # Make sure move can be made
-        if source.contents == 0 or destination.contents != 0:
-            return False
-        # Move the piece to the empty space
-        destination.contents = source.contents
-        source.contents = 0
-        # Change turn
-        self.passTurn()
-        return True
-
     def useInput(self, event, board, paused):
         #Disallow user input while game is paused
         if not paused:
             if event.type==KEYDOWN and event.key==K_RETURN:
                 if len(self.curMoveChain)>=2: #need at least a start and an end
                     # Actually make the move
-                    self.make_move(self.curMoveChain[0], self.curMoveChain[-1])
+                    board.make_move(self.curMoveChain[0], self.curMoveChain[-1])
                     self.curMoveChain = [] # Empty the move chain
             elif event.type==KEYDOWN and event.key==K_BACKSPACE:
                 if len(self.curMoveChain)>0:
@@ -296,10 +289,6 @@ class player:
                         self.curMoveChain=[point]
                 elif self.curMoveChain[-1].canJumpTo(point,len(self.curMoveChain)==1):
                     self.curMoveChain.append(point)
-
-    def passTurn(self):
-        self.screen.curPlayer = self.screen.players[self.number%self.board.numPlayers]
-        self.screen.turnTimeTaken = 0
 
     #Current intended move procedure: click the piece you want to move,
         #then click each circle on your path, then press enter when you're done.
@@ -397,9 +386,14 @@ class screen: #the pygame screen and high-level "running the game" stuff
 
     # Game update, handles AI and input
     def update(self):
+        curr_player = self.board.curPlayer
         while self.running and self.playing:
             self.play_turn(self.board)
             self.checkWin()
+            # When it's the other player's turn, update turn time
+            if self.board.curPlayer != curr_player:
+                self.turnTimeTaken = 0
+                curr_player = self.board.curPlayer
             # Maintain update rate to FPS
             self.clock.tick(self.fps)
 
@@ -411,7 +405,7 @@ class screen: #the pygame screen and high-level "running the game" stuff
             #Handle time outs during player turns
             self.turnTimeTaken += self.clock.get_time() #Increment the turn timer
             if self.turnTimeTaken > self.maximumTurnTime:
-                self.curPlayer.passTurn()
+                self.board.passTurn()
 
     def play_turn(self, board):
         # If the current player is not remote
