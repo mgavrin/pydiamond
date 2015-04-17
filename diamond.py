@@ -8,9 +8,9 @@ from threading import Thread
 # Instantiate AI objects for each AI player
 def get_AIs(AIs, difficulties):
     ai_list = []
-    for ai in AIs:
-        if ai:
-            ai_list.append(AI(difficulties[AIs.index(ai)]))
+    for i in range(len(AIs)):
+        if AIs[i]:
+            ai_list.append(AI(difficulties[i]))
         else:
             ai_list.append(None)
     return ai_list
@@ -459,7 +459,7 @@ class screen: #the pygame screen and high-level "running the game" stuff
             self.playing = False
         
 #change this line to control the number of players, which, if any, are AIs, and the AI difficulties
-test=board(2,[True,True], [2, 2])
+test=board(2,[True,True], [2,2])
 game=screen(test,450,1000, None)
 
 #Code provenance notes:

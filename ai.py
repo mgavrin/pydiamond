@@ -249,7 +249,7 @@ class AI:
                     moves=self.possible_moves(farthest_piece)
         if moves==[]: #no good or neutral moves, take the least bad move
             print "shenanigans!"
-            return self.random_ai(board)
+            return self.directional_slide_ai(board)
 ##            for piece in board.get_pieces(player):
 ##                if len(self.possible_moves(piece))>0:
 ##                    cur_dist=abs((end_tip.yPos - 34) - piece.yPos)#vertical distance
