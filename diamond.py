@@ -275,7 +275,7 @@ class player:
         self.passTurn()
         return True
 
-    def useInput(self, event, paused):
+    def useInput(self, event, board, paused):
         #Disallow user input while game is paused
         if not paused:
             if event.type==KEYDOWN and event.key==K_RETURN:
@@ -288,7 +288,7 @@ class player:
                     self.curMoveChain=self.curMoveChain[:-1]
             elif event.type==MOUSEBUTTONDOWN:
                 pos=event.pos
-                point=self.board.getNearestPoint(pos)
+                point=board.getNearestPoint(pos)
                 if not point:
                     return False #click wasn't near any points on the board
                 elif len(self.curMoveChain)==0:
@@ -319,7 +319,7 @@ class Network:
     # If something fails at any point here, nothing can be done, so let it
     def get_turn(self, board):
         # Receive a move from the socket
-        msg = self.socket.recv(self.mess_len1)
+        msg = self.socket.recv(self.mess_len)
         # Get parts out of message
         parts = move.split(":")
         origin = parts[0].split(",")
@@ -373,7 +373,7 @@ class screen: #the pygame screen and high-level "running the game" stuff
         self.winMessage=""#nobody has won yet
         self.paused = False #Whether or not the game is paused
         self.turnTimeTaken = 0 #Time taken for the current turn in ms
-        self.maximumTurnTime = 10000 #Maximum time allowed per turn in ms
+        self.maximumTurnTime = 100000 #Maximum time allowed per turn in ms
         self.mainloop() #this has to be the last thing in the init before exit,
         #because it isn't supposed to terminate until you end the session
         pygame.display.quit()
@@ -447,7 +447,7 @@ class screen: #the pygame screen and high-level "running the game" stuff
             else:
                 # If it's a human player's turn, accept their input
                 if self.playing and not board.curPlayer.AI:
-                    board.curPlayer.useInput(event, self.paused)
+                    board.curPlayer.useInput(event, board, self.paused)
 
     def saveGame(self):
         f = open('save.dat', 'w')
