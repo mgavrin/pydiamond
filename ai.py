@@ -165,7 +165,7 @@ class AI:
     direction of the target zone in relation to the start. The AI will not
     make jumps and take a while to get towards the end triangle.
     """
-    def directional_slide_ai(self, board):
+    def directional_slide_ai(self, board,depth=0):
         player = board.curPlayer
         # Pick a random piece to move
         piece = self.random_piece(board)
@@ -183,8 +183,8 @@ class AI:
                     piece.neighbors[directions[1]].contents != 0:
                 # If the piece is as high as it can go in its end triangle,
                 # move another piece
-                if (piece.xPos, piece.yPos) in player.endTri.pointPositions:
-                    return self.directional_slide_ai(board)
+                if (piece.xPos, piece.yPos) in player.endTri.pointPositions and depth<10:
+                    return self.directional_slide_ai(board,depth+1)
                 # If it cannot move in a preferred direction, pick a random one
                 return self.random_move(board, piece)
             # Otherwise it can move in only one of the two preferred ones,
@@ -236,36 +236,49 @@ class AI:
         end_tip = filter(lambda p: len(p.neighbors) == 2, player.endTri.points)[0]
         # Give points for all pieces
         farthest_piece=board.get_pieces(player)[0]
-        farthest_dist=-1
-        moves=[]
+        farthest_dist=-10000
+        farthest_piece_moves=[]
+        all_moves=[]
         for piece in board.get_pieces(player):
-            horizOkay=(moves==[])
-            if len(self.possible_moves(piece))>0 and self.has_useful_moves(piece,player,horizOkay):
+            if len(self.possible_moves(piece))>0 and self.has_useful_moves(piece,player,False):
+                all_moves=self.possible_moves(piece)
                 cur_dist=abs((end_tip.yPos - 34) - piece.yPos)#vertical distance
                 cur_dist+=abs(end_tip.xPos - piece.xPos) #plus horizontal distance
                 if cur_dist>farthest_dist:
                     farthest_piece=piece
                     farthest_dist=cur_dist
-                    moves=self.possible_moves(farthest_piece)
-        if moves==[]: #no good or neutral moves, take the least bad move
-            print "shenanigans!"
+                    farthest_piece_moves=self.possible_moves(farthest_piece)
+        if farthest_piece_moves==[] and not all_moves==[]:
+            farthest_piece_moves=all_moves #just move something if you can't move the back one
+        if all_moves==[]: #no good moves, look for neutral ones
+            for piece in board.get_pieces(player):
+                if len(self.possible_moves(piece))>0 and self.has_useful_moves(piece,player,True):
+                    cur_dist=abs((end_tip.yPos - 34) - piece.yPos)#vertical distance
+                    cur_dist+=abs(end_tip.xPos - piece.xPos) #plus horizontal distance
+                    if cur_dist>farthest_dist:
+                        farthest_piece=piece
+                        farthest_dist=cur_dist
+                        moves=self.possible_moves(farthest_piece)
+        if all_moves==[]: #no good or neutral moves, resort to directional AI
             return self.directional_slide_ai(board)
-##            for piece in board.get_pieces(player):
-##                if len(self.possible_moves(piece))>0:
-##                    cur_dist=abs((end_tip.yPos - 34) - piece.yPos)#vertical distance
-##                    cur_dist+=abs(end_tip.xPos - piece.xPos) #plus horizontal distance
-##                    if cur_dist>farthest_dist:
-##                        farthest_piece=piece
-##                        farthest_dist=cur_dist
-##                        moves=self.possible_moves(farthest_piece)
-        best_move=moves[0]
-        best_score=-10000
-        for move in moves:
+        best_move=all_moves[0]
+        best_score=0
+        bonusmoves=[] #take this out, it's for testing!
+        badmoves=[] #take this out, it's for testing!
+        for move in all_moves:
             cur_dist=abs((end_tip.yPos - 34) - piece.yPos)#vertical distance
             cur_dist+=abs(end_tip.xPos - piece.xPos) #plus horizontal distance
             post_move_dist=abs((end_tip.yPos - 34) - move.yPos)#vertical distance
             post_move_dist+=abs(end_tip.xPos - move.xPos) #plus horizontal distance
             new_score=cur_dist-post_move_dist
+            if (piece.xPos, piece.yPos) not in player.endTri.pointPositions:
+                if (move.xPos, move.yPos) in player.endTri.pointPositions:
+                    new_score+=10000 #bonus for moves that get a piece into the end triangle
+                    bonusmoves.append(move)
+            if (piece.xPos, piece.yPos) in player.endTri.pointPositions:
+                if (move.xPos, move.yPos) not in player.endTri.pointPositions:
+                    new_score-=10000 #nega-bonus for moves that take a piece out of the end triangle
+                    badmoves.append(move) 
             if new_score>best_score:
                 best_move=move
                 best_score=new_score
