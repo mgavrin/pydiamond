@@ -58,6 +58,7 @@ class AI:
     """
     def evaluate(self, player, board):
         score = 0
+        y_space = 34
         # Find tip of the end triangles
         end_tip = filter(lambda p: len(p.neighbors) == 2, player.endTri.points)[0]
         # And get the opponent and the position of its end triangle
@@ -65,16 +66,15 @@ class AI:
         opp_end_tip = filter(lambda p: len(p.neighbors) == 2, opponent.endTri.points)[0]
         # Give points for all pieces
         for piece in board.get_pieces(player):
-            # Score well for pieces close vertically
-            score += 408 - abs((end_tip.yPos - 34) - piece.yPos)
-            # And close horizontally
+            # The closer to the end the better
+            score += 500 - abs(end_tip.yPos - y_space - piece.yPos)
+            # And make sure to be close horizontally
             if piece.xPos >= 160 and piece.xPos <= 280:
                 score += 100
         # Remove points for how well opponent is doing
         for piece in board.get_pieces(opponent):
-            # Score well for pieces close vertically
-            score -= 408 - abs((opp_end_tip.yPos - 34) - piece.yPos)
-            # And close horizontally
+            score -= 500 - abs(end_tip.yPos - y_space - piece.yPos)
+            # And make sure to be close horizontally
             if piece.xPos >= 160 and piece.xPos <= 280:
                 score -= 100
         return score
