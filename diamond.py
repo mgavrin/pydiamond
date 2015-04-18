@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import pygame
 from pygame.locals import *
 import ai
@@ -370,10 +372,7 @@ class screen: #the pygame screen and high-level "running the game" stuff
         self.winMessage=""#nobody has won yet
         self.paused = False #Whether or not the game is paused
         self.turnTimeTaken = 0 #Time taken for the current turn in ms
-        self.maximumTurnTime = 100000 #Maximum time allowed per turn in ms
-        self.mainloop() #this has to be the last thing in the init before exit,
-        #because it isn't supposed to terminate until you end the session
-        pygame.display.quit()
+        self.maximumTurnTime = 10000 #Maximum time allowed per turn in ms
 
     def mainloop(self):
         try:
@@ -391,6 +390,8 @@ class screen: #the pygame screen and high-level "running the game" stuff
             self.running = False
             # Raise the exception
             raise
+        # Exit the game at the end of the loop
+        pygame.display.quit()
 
     # Game update, handles AI and input
     def update(self):
@@ -410,19 +411,13 @@ class screen: #the pygame screen and high-level "running the game" stuff
         while self.running:
             self.drawScreen()
             self.getInput(self.board)
-            #Handle time outs during player turns
-            self.turnTimeTaken += self.clock.get_time() #Increment the turn timer
-            if self.turnTimeTaken > self.maximumTurnTime:
-                self.board.curPlayer = self.board.players[self.board.curPlayer.number%self.board.numPlayers]
-                self.turnTimeTaken = 0
-            # # When it's the other player's turn, update turn time
-            # if self.board.curPlayer != curr_player:
-            #     self.turnTimeTaken = 0
-            #     curr_player = self.board.curPlayer
-            # #Handle time outs during player turns
-            # self.turnTimeTaken += self.clock.get_time() #Increment the turn timer
-            # if self.turnTimeTaken > self.maximumTurnTime:
-            #     self.board.passTurn()
+            # The turn timer does not work for networked games
+            if self.network == None:
+                #Handle time outs during player turns
+                self.turnTimeTaken += self.clock.get_time() #Increment the turn timer
+                if self.turnTimeTaken > self.maximumTurnTime:
+                    self.board.curPlayer = self.board.players[self.board.curPlayer.number%self.board.numPlayers]
+                    self.turnTimeTaken = 0
 
     def play_turn(self, board):
         player = board.curPlayer
@@ -442,6 +437,8 @@ class screen: #the pygame screen and high-level "running the game" stuff
                 pass
             # Then we need to send the remote player the move
             self.network.send_turn(board.moves[-1])
+        # And end of turn, reset timer
+        self.turnTimeTaken = 0
 
     def getInput(self,board):
         events = pygame.event.get()
@@ -541,12 +538,12 @@ class screen: #the pygame screen and high-level "running the game" stuff
             self.winMessage+="Player 3 wins!"
             self.playing = False
         
-#change this line to control the number of players, which, if any, are AIs, and the AI difficulties
-test=board(2,[True,True], [2,3])
-game=screen(test,450,1000, None)
-game.mainloop() #this has to be the last thing before exit,
-#because it isn't supposed to terminate until you end the session
-pygame.display.quit()
+if __name__ == '__main__':
+    # Create a board with AI/human players and AI difficulties
+    test=board(2,[True,True], [2,3])
+    game=screen(test,450,1000, None)
+    # Run the game loop
+    game.mainloop()
 
 #Code provenance notes:
     #Instructions and code for putting text on the screen were borrowed from
