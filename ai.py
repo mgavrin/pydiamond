@@ -340,7 +340,10 @@ class AI:
         # Find all possible moves the player can make
         for piece in board.get_pieces(board.curPlayer):
             for move in self.possible_moves(piece):
-                moves.append((piece, move))
+                # Get only the coordinates of the move
+                src = (piece.xPos, piece.yPos)
+                dest = (move.xPos, move.yPos)
+                moves.append((src, dest))
         nodes = [] # Tree nodes to return
         # For every possible move, generate a tree item and keep looking
         for move in moves:
@@ -350,7 +353,7 @@ class AI:
             # Get a new board object by copying the old one
             new_board = deepcopy(board)
             # Make the move (thus changing player's turn)
-            new_board.make_move(copy(move[0]), copy(move[1]))
+            new_board.make_move(move[0], move[1])
             # Build a tree node to add to the list of nodes
             node = TreeNode({
                 "score": self.evaluate(board.curPlayer, new_board),
@@ -368,9 +371,16 @@ class AI:
         best = game_tree.children[0]
         # Iterate through all leaves in the tree
         for leaf in game_tree.leaves():
-            # Then find the one with the highest score
-            if leaf.element["score"] > best.element["score"]:
-                best = leaf
+            # If the turn on the leaf is for the current player
+            if leaf.element["board"].curPlayer == game_tree.element["board"].curPlayer:
+                # Then find the one with the highest score
+                if leaf.element["score"] > best.element["score"]:
+                    best = leaf
+            # Otherwise, if it's the opponent's turn
+            else:
+                # Then find the one with the lowest score
+                if leaf.element["score"] < best.element["score"]:
+                    best = leaf
         # Then find which branch of the tree contains that option
         for node in game_tree.children:
             if node.contains(best):
