@@ -48,7 +48,7 @@ class AI:
         # A set direction that the AI should move in
         self.set_dir = -1 # disabled to start
         # Maximum search time of the AI
-        self.max_time = 2
+        self.max_time = 1
         # Time that a move search started
         self.search_start = 0
 
@@ -68,13 +68,15 @@ class AI:
             # Score well for pieces close vertically
             score += 408 - abs((end_tip.yPos - 34) - piece.yPos)
             # And close horizontally
-            score += 100 - abs(end_tip.xPos - piece.xPos)
+            if piece.xPos >= 160 and piece.xPos <= 280:
+                score += 100
         # Remove points for how well opponent is doing
         for piece in board.get_pieces(opponent):
             # Score well for pieces close vertically
             score -= 408 - abs((opp_end_tip.yPos - 34) - piece.yPos)
             # And close horizontally
-            score -= 100 - abs(opp_end_tip.xPos - piece.xPos)
+            if piece.xPos >= 160 and piece.xPos <= 280:
+                score -= 100
         return score
 
     """
@@ -322,10 +324,6 @@ class AI:
         if move == None:
             return self.directional_slide_ai(board)
         end_tip = filter(lambda p: len(p.neighbors) == 2, board.curPlayer.endTri.points)[0]
-        # print "_" * 50
-        # print "({}, {})".format(end_tip.xPos, end_tip.yPos)
-        # print "({}, {}) -> ({}, {})".format(move[0].xPos, move[0].yPos, move[1].xPos, move[1].yPos)
-        # print game_tree.element["score"]
         # And finally make the move
         return self.final_move(board, move[0], move[1])
 
@@ -368,19 +366,13 @@ class AI:
     Find the best possible move in a game tree.
     """
     def find_best(self, game_tree):
+        player_num = game_tree.element["board"].curPlayer.number
         best = game_tree.children[0]
         # Iterate through all leaves in the tree
         for leaf in game_tree.leaves():
-            # If the turn on the leaf is for the current player
-            if leaf.element["board"].curPlayer == game_tree.element["board"].curPlayer:
-                # Then find the one with the highest score
-                if leaf.element["score"] > best.element["score"]:
-                    best = leaf
-            # Otherwise, if it's the opponent's turn
-            else:
-                # Then find the one with the lowest score
-                if leaf.element["score"] < best.element["score"]:
-                    best = leaf
+            # Then find the one with the highest score
+            if leaf.element["score"] > best.element["score"]:
+                best = leaf
         # Then find which branch of the tree contains that option
         for node in game_tree.children:
             if node.contains(best):
