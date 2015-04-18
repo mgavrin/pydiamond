@@ -158,9 +158,17 @@ class board:
     # Get a point at the given coordinates on the board
     def get_point(self, pos):
         return self.pointPositions[(pos[0], pos[1])]
+                
+    # Get all pieces belonging to the given player
+    def get_pieces(self, player):
+        return filter(lambda point: point.contents == player.number, self.allPoints)
 
     # Make a move given source and destination points
     def make_move(self, source, destination):
+        # If coordinates were passed instead of objects, get the objects
+        if type(source) == tuple and type(destination) == tuple:
+            source = self.get_point(source)
+            destination = self.get_point(destination)
         # Make sure move can be made
         if source.contents == 0 or destination.contents != 0:
             return False
@@ -171,12 +179,12 @@ class board:
         self.moves.append(((source.xPos, source.yPos),
                           (destination.xPos, destination.yPos)))
         # Change turn
-        self.curPlayer = self.players[self.curPlayer.number % self.numPlayers]
+        self.passTurn()
         return True
-                
-    # Get all pieces belonging to the given player
-    def get_pieces(self, player):
-        return filter(lambda point: point.contents == player.number, self.allPoints)
+
+    # Pass a player's turn
+    def passTurn(self):
+        self.curPlayer = self.players[self.curPlayer.number % self.numPlayers]
       
     def AIMove(self, number):
         # Run the current player's AI
@@ -264,31 +272,20 @@ class player:
         # starting with initial location of moved piece
         self.curMoveChain=[]
 
-    def make_move(self, source, destination):
-        # Make sure move can be made
-        if source.contents == 0 or destination.contents != 0:
-            return False
-        # Move the piece to the empty space
-        destination.contents = source.contents
-        source.contents = 0
-        # Change turn
-        self.passTurn()
-        return True
-
-    def useInput(self,event):
+    def useInput(self, event, board, paused):
         #Disallow user input while game is paused
-        if not self.screen.paused:
+        if not paused:
             if event.type==KEYDOWN and event.key==K_RETURN:
                 if len(self.curMoveChain)>=2: #need at least a start and an end
                     # Actually make the move
-                    self.make_move(self.curMoveChain[0], self.curMoveChain[-1])
+                    board.make_move(self.curMoveChain[0], self.curMoveChain[-1])
                     self.curMoveChain = [] # Empty the move chain
             elif event.type==KEYDOWN and event.key==K_BACKSPACE:
                 if len(self.curMoveChain)>0:
                     self.curMoveChain=self.curMoveChain[:-1]
             elif event.type==MOUSEBUTTONDOWN:
                 pos=event.pos
-                point=self.board.getNearestPoint(pos)
+                point=board.getNearestPoint(pos)
                 if not point:
                     return False #click wasn't near any points on the board
                 elif len(self.curMoveChain)==0:
@@ -304,18 +301,27 @@ class player:
         #If you press Enter without having selected a valid move, nothing will happen.
 
 class Network:
-    def __init__(self, socket):
+    def __init__(self, socket, player_num):
         # Socket to read to and write from
         self.socket = socket
+        # Local player's player number
+        self.number = player_num
         # Message length to be receiving
-        self.mess_len = len("xo,yo:xt,yt")
+        self.mess_len = len("0xo,0yo:0xt,0yt")
     
     # If something fails at any point here, nothing can be done, so let it
     def get_turn(self, board):
         # Receive a move from the socket
-        msg = self.socket.recv(self.mess_len1)
+        msg = self.socket.recv(self.mess_len)
+        # If too-short message received
+        if len(msg) < self.mess_len:
+            print "Opponent exited."
+            # Close socket and set to none for screen to see
+            self.socket.close()
+            self.socket = None
+            return
         # Get parts out of message
-        parts = move.split(":")
+        parts = msg.split(":")
         origin = parts[0].split(",")
         target = parts[1].split(",")
         # Then convert them to ints
@@ -330,20 +336,21 @@ class Network:
         board.make_move(source, destination)
 
     def send_turn(self, move):
-        # Turn the move into a string
-        msg = "{},{}:{},{}".format(\
+        # Turn the move into a string and pad numbers
+        msg = "{0:03d},{1:03d}:{2:03d},{3:03d}".format(\
                 move[0][0], move[0][1],\
                 move[1][0], move[1][1])
         # Send the message over the socket
         self.socket.sendall(msg)
 
-    def close(self):
-        self.socket.close()
-
 class screen: #the pygame screen and high-level "running the game" stuff
     def __init__(self,board,xDim,yDim,network):
         self.board=board
         self.network = network # Can play a networked game
+        if self.network != None:
+            # Set the board's local and remote players
+            self.board.players[network.number - 1].remote = False
+            self.board.players[network.number % self.board.numPlayers].remote = True
         # Graphics related things
         self.xDim=xDim
         self.yDim=yDim
@@ -363,7 +370,7 @@ class screen: #the pygame screen and high-level "running the game" stuff
         self.winMessage=""#nobody has won yet
         self.paused = False #Whether or not the game is paused
         self.turnTimeTaken = 0 #Time taken for the current turn in ms
-        self.maximumTurnTime = 10000 #Maximum time allowed per turn in ms
+        self.maximumTurnTime = 100000 #Maximum time allowed per turn in ms
         self.mainloop() #this has to be the last thing in the init before exit,
         #because it isn't supposed to terminate until you end the session
         pygame.display.quit()
@@ -387,7 +394,11 @@ class screen: #the pygame screen and high-level "running the game" stuff
 
     # Game update, handles AI and input
     def update(self):
+        # Make sure the game is running and players are playing
         while self.running and self.playing:
+            # Exit if network closes
+            if self.network != None and self.network.socket == None:
+                return
             self.play_turn(self.board)
             self.checkWin()
             # Maintain update rate to FPS
@@ -395,6 +406,7 @@ class screen: #the pygame screen and high-level "running the game" stuff
 
     # Display updating, handles display and input
     def display(self):
+        curr_player = self.board.curPlayer
         while self.running:
             self.drawScreen()
             self.getInput(self.board)
@@ -403,19 +415,31 @@ class screen: #the pygame screen and high-level "running the game" stuff
             if self.turnTimeTaken > self.maximumTurnTime:
                 self.board.curPlayer = self.board.players[self.board.curPlayer.number%self.board.numPlayers]
                 self.turnTimeTaken = 0
+            # # When it's the other player's turn, update turn time
+            # if self.board.curPlayer != curr_player:
+            #     self.turnTimeTaken = 0
+            #     curr_player = self.board.curPlayer
+            # #Handle time outs during player turns
+            # self.turnTimeTaken += self.clock.get_time() #Increment the turn timer
+            # if self.turnTimeTaken > self.maximumTurnTime:
+            #     self.board.passTurn()
 
     def play_turn(self, board):
+        player = board.curPlayer
         # If the current player is not remote
-        if not board.curPlayer.remote:
-            if board.curPlayer.AI: # AI
-                board.AIMove(board.curPlayer.number)
+        if not player.remote:
+            if player.AI: # AI
+                board.AIMove(player.number)
             else: # Human
                 self.getInput(board)
         # Otherwise get the turn from the network
         else:
             self.network.get_turn(board)
         # If the game is networked and the player is local
-        if self.network != None and not board.curPlayer.remote:
+        if self.network != None and not player.remote:
+            # Wait until a move was made
+            while board.curPlayer == player:
+                pass
             # Then we need to send the remote player the move
             self.network.send_turn(board.moves[-1])
 
@@ -436,9 +460,11 @@ class screen: #the pygame screen and high-level "running the game" stuff
                 elif event.key == pygame.K_p:
                     self.paused = not self.paused
             else:
-                # If it's a human player's turn, accept their input
-                if self.playing and not board.curPlayer.AI:
-                    board.curPlayer.useInput(board,event)
+                # If it's a human non-remote player's turn, accept their input
+                if self.playing and\
+                        not board.curPlayer.AI and\
+                        not board.curPlayer.remote:
+                    board.curPlayer.useInput(event, board, self.paused)
 
     def saveGame(self):
         f = open('save.dat', 'w')
@@ -516,7 +542,7 @@ class screen: #the pygame screen and high-level "running the game" stuff
             self.playing = False
         
 #change this line to control the number of players, which, if any, are AIs, and the AI difficulties
-test=board(2,[True,True], [2,1])
+test=board(2,[True,True], [2,3])
 game=screen(test,450,1000, None)
 game.mainloop() #this has to be the last thing before exit,
 #because it isn't supposed to terminate until you end the session
