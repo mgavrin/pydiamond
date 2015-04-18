@@ -12,11 +12,13 @@ class TreeNode:
     """
     def leaves(self):
         # Leaf, so return self
-        if self.children == None:
+        if self.children == [] or self.children == None:
             return [self]
         # Otherwise find every leaf below this one
         leaves = []
         for child in self.children:
+            if child == None:
+                continue
             leaves += child.leaves()
         # Then find the best score of all leaves
         return leaves
@@ -30,6 +32,8 @@ class TreeNode:
         if self.children == None: # Leaf, no match
             return False
         for child in self.children: # Check children
+            if child == None:
+                continue
             if child.contains(node): # Recurse
                 return True
         # No children contain it so no match
@@ -42,7 +46,7 @@ class AI:
                 self.random_ai,
                 self.directional_slide_ai,
                 self.naive_maximizer_ai,
-                self.minimax_ai ]
+                self.best_score ]
         # Select an AI to use based on dificulty setting
         self.ai_player = self.ai_list[difficulty]
         # A set direction that the AI should move in
@@ -70,13 +74,12 @@ class AI:
             score += 500 - abs(end_tip.yPos - y_space - piece.yPos)
             # And make sure to be close horizontally
             if piece.xPos >= 160 and piece.xPos <= 280:
-                score += 100
+                score += 200
         # Remove points for how well opponent is doing
         for piece in board.get_pieces(opponent):
             score -= 500 - abs(end_tip.yPos - y_space - piece.yPos)
-            # And make sure to be close horizontally
             if piece.xPos >= 160 and piece.xPos <= 280:
-                score -= 100
+                score -= 200
         return score
 
     """
@@ -299,15 +302,14 @@ class AI:
             if post_move_dist<cur_dist or (post_move_dist==cur_dist and horizOkay):
                 return True
         return False
-            
 
-    """
+        """
     An AI player that generates a tree of game states and then searches for the
     move that will have the best outcome further down the line.
     An element is made of its score value, the move that got it there and the
     board object that it results in.
     """
-    def minimax_ai(self, board):
+    def best_score(self, board):
         # Start search timer
         self.search_start = time()
         # Start the tree with the current game state
