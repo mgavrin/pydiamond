@@ -540,11 +540,48 @@ class screen: #the pygame screen and high-level "running the game" stuff
         
 # Only call this if the file is run, not imported
 if __name__ == '__main__':
+    # Default options
+    num_players = 2
+    ais = [False, True]
+    difficulties = [2, 3]
+    # Read arguments for game setup; if diretional_slide_ai is being used.
+    # only two players can play.
+    argc, argv = len(sys.argv), sys.argv
+    try:
+        # Count the players and see which are AI and which are human
+        if argc > 1:
+            num_players = 0
+            for i in range(len(argv[1])):
+                # Takes a string of T and F (True, False)
+                if argv[1][i] == "T":
+                    ais[i] = True
+                else:
+                    ais[i] = False
+                num_players += 1
+        # Set the difficulties passed to the command line
+        if argc == 3:
+            for i in range(len(argv[2])):
+                num = int(argv[2][i])
+                if 0 <= num <= 3:
+                    difficulties[i] = num
+                elif num < 0:
+                    difficulties[i] = 0
+                else:
+                    difficulties[i] = 3
+    # If an int could not be converted correctly, do not worry,
+    # as defaults will be used.
+    except ValueError:
+        pass
+    # Otherwise raise the error
+    except:
+        raise
     # Create a board with AI/human players and AI difficulties
-    test=board(2,[True,True], [2,3])
-    game=screen(test,450,1000, None)
+    b = board(num_players, ais, difficulties)
+    game = screen(b, 450, 1000, None)
     # Run the game loop
     game.mainloop()
+    # Quit the display
+    pygame.display.quit()
 
 #Code provenance notes:
     #Instructions and code for putting text on the screen were borrowed from
