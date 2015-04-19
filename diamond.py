@@ -538,6 +538,7 @@ class screen: #the pygame screen and high-level "running the game" stuff
             self.winMessage+="Player 3 wins!"
             self.playing = False
         
+# Only call this if the file is run, not imported
 if __name__ == '__main__':
     # Create a board with AI/human players and AI difficulties
     test=board(2,[True,True], [2,3])
