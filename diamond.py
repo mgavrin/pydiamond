@@ -265,6 +265,13 @@ class player:
                         self.curMoveChain=[point]
                 elif self.curMoveChain[-1].canJumpTo(point,len(self.curMoveChain)==1):
                     self.curMoveChain.append(point)
+        else:
+            font = pygame.font.Font(None, 36)
+            text = font.render("Hello world!", 1, (10, 10, 10))
+            textpos = text.get_rect()
+            textpos.centerx = 100
+            textpos.centery = 500
+            self.screen.gameScreen.blit(text, textpos)
 
     def passTurn(self):
         self.screen.curPlayer = self.screen.players[self.number%self.board.numPlayers]
@@ -410,6 +417,13 @@ class screen: #the pygame screen and high-level "running the game" stuff
             self.gameScreen.blit(self.font.render(self.instructions[i], True, (0,0,255)), (20, 450+30*i))
         self.gameScreen.blit(self.font.render("Current player: "+str(self.curPlayer.number), True, (0,0,255)), (20, 10))
         self.gameScreen.blit(self.font.render(self.winMessage, True, (0,0,255)), (20, 40))
+        self.gameScreen.blit(self.font.render("Time left for current turn: " + str((self.maximumTurnTime - self.turnTimeTaken) / 1000) + " sec", True, (0,0,255)), (20, 570))
+        pausemsg = "The game is currently "
+        if self.paused:
+            pausemsg = pausemsg + "paused"
+        else:
+            pausemsg = pausemsg + "not paused"
+        self.gameScreen.blit(self.font.render(pausemsg, True, (0,0,255)), (20, 600))
         pygame.display.flip()
 
     def checkWin(self):
