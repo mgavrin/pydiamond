@@ -516,7 +516,7 @@ class screen: #the pygame screen and high-level "running the game" stuff
             self.playing = False
         
 #change this line to control the number of players, which, if any, are AIs, and the AI difficulties
-test=board(2,[True,True], [2,1])
+test=board(2,[True,True], [2,3])
 game=screen(test,450,1000, None)
 game.mainloop() #this has to be the last thing before exit,
 #because it isn't supposed to terminate until you end the session
