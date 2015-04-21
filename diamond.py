@@ -282,7 +282,7 @@ class player:
                     # Actually make the move
                     board.make_move(self.curMoveChain[0], self.curMoveChain[-1])
                     self.curMoveChain = [] # Empty the move chain
-                    return True
+                    return True # Notify the caller that a move was made
             elif event.type==KEYDOWN and event.key==K_BACKSPACE:
                 if len(self.curMoveChain)>0:
                     self.curMoveChain=self.curMoveChain[:-1]
@@ -296,6 +296,8 @@ class player:
                         self.curMoveChain=[point]
                 elif self.curMoveChain[-1].canJumpTo(point,len(self.curMoveChain)==1):
                     self.curMoveChain.append(point)
+        # No move was made
+        return False
 
     #Current intended move procedure: click the piece you want to move,
         #then click each circle on your path, then press enter when you're done.
