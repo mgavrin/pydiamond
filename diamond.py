@@ -275,13 +275,14 @@ class player:
         self.curMoveChain=[]
 
     def useInput(self, event, board, paused):
-        #Disallow user input while game is paused
+        # Only allow input of game is running
         if not paused:
             if event.type==KEYDOWN and event.key==K_RETURN:
                 if len(self.curMoveChain)>=2: #need at least a start and an end
                     # Actually make the move
                     board.make_move(self.curMoveChain[0], self.curMoveChain[-1])
                     self.curMoveChain = [] # Empty the move chain
+                    return True
             elif event.type==KEYDOWN and event.key==K_BACKSPACE:
                 if len(self.curMoveChain)>0:
                     self.curMoveChain=self.curMoveChain[:-1]
@@ -402,6 +403,13 @@ class screen: #the pygame screen and high-level "running the game" stuff
                 return
             self.play_turn(self.board)
             self.checkWin()
+            # The turn timer does not work for networked games
+            if self.network == None:
+                #Handle time outs during player turns
+                self.turnTimeTaken += self.clock.get_time() #Increment the turn timer
+                if self.turnTimeTaken > self.maximumTurnTime:
+                    self.board.passTurn()
+                    self.turnTimeTaken = 0
             # Maintain update rate to FPS
             self.clock.tick(self.fps)
 
@@ -411,13 +419,6 @@ class screen: #the pygame screen and high-level "running the game" stuff
         while self.running:
             self.drawScreen()
             self.getInput(self.board)
-            # The turn timer does not work for networked games
-            if self.network == None:
-                #Handle time outs during player turns
-                self.turnTimeTaken += self.clock.get_time() #Increment the turn timer
-                if self.turnTimeTaken > self.maximumTurnTime:
-                    self.board.curPlayer = self.board.players[self.board.curPlayer.number%self.board.numPlayers]
-                    self.turnTimeTaken = 0
 
     def play_turn(self, board):
         player = board.curPlayer
@@ -425,6 +426,8 @@ class screen: #the pygame screen and high-level "running the game" stuff
         if not player.remote:
             if player.AI: # AI
                 board.AIMove(player.number)
+                # And end of turn, reset timer
+                self.turnTimeTaken = 0
             else: # Human
                 self.getInput(board)
         # Otherwise get the turn from the network
@@ -437,8 +440,6 @@ class screen: #the pygame screen and high-level "running the game" stuff
                 pass
             # Then we need to send the remote player the move
             self.network.send_turn(board.moves[-1])
-        # And end of turn, reset timer
-        self.turnTimeTaken = 0
 
     def getInput(self,board):
         events = pygame.event.get()
@@ -461,7 +462,10 @@ class screen: #the pygame screen and high-level "running the game" stuff
                 if self.playing and\
                         not board.curPlayer.AI and\
                         not board.curPlayer.remote:
-                    board.curPlayer.useInput(event, board, self.paused)
+                    # Handle the input
+                    if board.curPlayer.useInput(event, board, self.paused):
+                        # And reset the timer if a move was performed
+                        self.turnTimeTaken = 0
 
     def saveGame(self):
         f = open('save.dat', 'w')
@@ -508,6 +512,13 @@ class screen: #the pygame screen and high-level "running the game" stuff
             self.gameScreen.blit(self.font.render(self.instructions[i], True, (0,0,255)), (20, 450+30*i))
         self.gameScreen.blit(self.font.render("Current player: "+str(self.board.curPlayer.number), True, (0,0,255)), (20, 10))
         self.gameScreen.blit(self.font.render(self.winMessage, True, (0,0,255)), (20, 40))
+        self.gameScreen.blit(self.font.render("Time left for current turn: " + str((self.maximumTurnTime - self.turnTimeTaken) / 1000) + " sec", True, (0,0,255)), (20, 570))
+        pausemsg = "The game is currently "
+        if self.paused:
+            pausemsg = pausemsg + "paused"
+        else:
+            pausemsg = pausemsg + "not paused"
+        self.gameScreen.blit(self.font.render(pausemsg, True, (0,0,255)), (20, 600))
         pygame.display.flip()
 
     def checkWin(self):
