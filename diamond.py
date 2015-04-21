@@ -245,7 +245,7 @@ class player:
         return True
 
     def useInput(self,event):
-        #Disallow user input while game is paused
+        # Only allow input of game is running
         if not self.screen.paused:
             if event.type==KEYDOWN and event.key==K_RETURN:
                 if len(self.curMoveChain)>=2: #need at least a start and an end
@@ -265,13 +265,6 @@ class player:
                         self.curMoveChain=[point]
                 elif self.curMoveChain[-1].canJumpTo(point,len(self.curMoveChain)==1):
                     self.curMoveChain.append(point)
-        else:
-            font = pygame.font.Font(None, 36)
-            text = font.render("Hello world!", 1, (10, 10, 10))
-            textpos = text.get_rect()
-            textpos.centerx = 100
-            textpos.centery = 500
-            self.screen.gameScreen.blit(text, textpos)
 
     def passTurn(self):
         self.screen.curPlayer = self.screen.players[self.number%self.board.numPlayers]
