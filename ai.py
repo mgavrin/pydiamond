@@ -12,11 +12,13 @@ class TreeNode:
     """
     def leaves(self):
         # Leaf, so return self
-        if self.children == None:
+        if self.children == [] or self.children == None:
             return [self]
         # Otherwise find every leaf below this one
         leaves = []
         for child in self.children:
+            if child == None:
+                continue
             leaves += child.leaves()
         # Then find the best score of all leaves
         return leaves
@@ -30,6 +32,8 @@ class TreeNode:
         if self.children == None: # Leaf, no match
             return False
         for child in self.children: # Check children
+            if child == None:
+                continue
             if child.contains(node): # Recurse
                 return True
         # No children contain it so no match
@@ -42,13 +46,13 @@ class AI:
                 self.random_ai,
                 self.directional_slide_ai,
                 self.naive_maximizer_ai,
-                self.minimax_ai ]
+                self.best_score ]
         # Select an AI to use based on dificulty setting
         self.ai_player = self.ai_list[difficulty]
         # A set direction that the AI should move in
         self.set_dir = -1 # disabled to start
         # Maximum search time of the AI
-        self.max_time = 2
+        self.max_time = 1
         # Time that a move search started
         self.search_start = 0
 
@@ -58,6 +62,7 @@ class AI:
     """
     def evaluate(self, player, board):
         score = 0
+        y_space = 34
         # Find tip of the end triangles
         end_tip = filter(lambda p: len(p.neighbors) == 2, player.endTri.points)[0]
         # And get the opponent and the position of its end triangle
@@ -65,16 +70,16 @@ class AI:
         opp_end_tip = filter(lambda p: len(p.neighbors) == 2, opponent.endTri.points)[0]
         # Give points for all pieces
         for piece in board.get_pieces(player):
-            # Score well for pieces close vertically
-            score += 408 - abs((end_tip.yPos - 34) - piece.yPos)
-            # And close horizontally
-            score += 100 - abs(end_tip.xPos - piece.xPos)
+            # The closer to the end the better
+            score += 500 - abs(end_tip.yPos - y_space - piece.yPos)
+            # And make sure to be close horizontally
+            if piece.xPos >= 160 and piece.xPos <= 280:
+                score += 200
         # Remove points for how well opponent is doing
         for piece in board.get_pieces(opponent):
-            # Score well for pieces close vertically
-            score -= 408 - abs((opp_end_tip.yPos - 34) - piece.yPos)
-            # And close horizontally
-            score -= 100 - abs(opp_end_tip.xPos - piece.xPos)
+            score -= 500 - abs(end_tip.yPos - y_space - piece.yPos)
+            if piece.xPos >= 160 and piece.xPos <= 280:
+                score -= 200
         return score
 
     """
@@ -297,15 +302,14 @@ class AI:
             if post_move_dist<cur_dist or (post_move_dist==cur_dist and horizOkay):
                 return True
         return False
-            
 
-    """
+        """
     An AI player that generates a tree of game states and then searches for the
     move that will have the best outcome further down the line.
     An element is made of its score value, the move that got it there and the
     board object that it results in.
     """
-    def minimax_ai(self, board):
+    def best_score(self, board):
         # Start search timer
         self.search_start = time()
         # Start the tree with the current game state
@@ -322,10 +326,6 @@ class AI:
         if move == None:
             return self.directional_slide_ai(board)
         end_tip = filter(lambda p: len(p.neighbors) == 2, board.curPlayer.endTri.points)[0]
-        # print "_" * 50
-        # print "({}, {})".format(end_tip.xPos, end_tip.yPos)
-        # print "({}, {}) -> ({}, {})".format(move[0].xPos, move[0].yPos, move[1].xPos, move[1].yPos)
-        # print game_tree.element["score"]
         # And finally make the move
         return self.final_move(board, move[0], move[1])
 
@@ -340,7 +340,10 @@ class AI:
         # Find all possible moves the player can make
         for piece in board.get_pieces(board.curPlayer):
             for move in self.possible_moves(piece):
-                moves.append((piece, move))
+                # Get only the coordinates of the move
+                src = (piece.xPos, piece.yPos)
+                dest = (move.xPos, move.yPos)
+                moves.append((src, dest))
         nodes = [] # Tree nodes to return
         # For every possible move, generate a tree item and keep looking
         for move in moves:
@@ -350,7 +353,7 @@ class AI:
             # Get a new board object by copying the old one
             new_board = deepcopy(board)
             # Make the move (thus changing player's turn)
-            new_board.make_move(copy(move[0]), copy(move[1]))
+            new_board.make_move(move[0], move[1])
             # Build a tree node to add to the list of nodes
             node = TreeNode({
                 "score": self.evaluate(board.curPlayer, new_board),
@@ -365,6 +368,7 @@ class AI:
     Find the best possible move in a game tree.
     """
     def find_best(self, game_tree):
+        player_num = game_tree.element["board"].curPlayer.number
         best = game_tree.children[0]
         # Iterate through all leaves in the tree
         for leaf in game_tree.leaves():

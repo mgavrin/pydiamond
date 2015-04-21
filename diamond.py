@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import pygame
 from pygame.locals import *
 import ai
@@ -158,9 +160,17 @@ class board:
     # Get a point at the given coordinates on the board
     def get_point(self, pos):
         return self.pointPositions[(pos[0], pos[1])]
+                
+    # Get all pieces belonging to the given player
+    def get_pieces(self, player):
+        return filter(lambda point: point.contents == player.number, self.allPoints)
 
     # Make a move given source and destination points
     def make_move(self, source, destination):
+        # If coordinates were passed instead of objects, get the objects
+        if type(source) == tuple and type(destination) == tuple:
+            source = self.get_point(source)
+            destination = self.get_point(destination)
         # Make sure move can be made
         if source.contents == 0 or destination.contents != 0:
             return False
@@ -171,12 +181,12 @@ class board:
         self.moves.append(((source.xPos, source.yPos),
                           (destination.xPos, destination.yPos)))
         # Change turn
-        self.curPlayer = self.players[self.curPlayer.number % self.numPlayers]
+        self.passTurn()
         return True
-                
-    # Get all pieces belonging to the given player
-    def get_pieces(self, player):
-        return filter(lambda point: point.contents == player.number, self.allPoints)
+
+    # Pass a player's turn
+    def passTurn(self):
+        self.curPlayer = self.players[self.curPlayer.number % self.numPlayers]
       
     def AIMove(self, number):
         # Run the current player's AI
@@ -264,31 +274,21 @@ class player:
         # starting with initial location of moved piece
         self.curMoveChain=[]
 
-    def make_move(self, source, destination):
-        # Make sure move can be made
-        if source.contents == 0 or destination.contents != 0:
-            return False
-        # Move the piece to the empty space
-        destination.contents = source.contents
-        source.contents = 0
-        # Change turn
-        self.passTurn()
-        return True
-
-    def useInput(self,event):
-        #Disallow user input while game is paused
-        if not self.screen.paused:
+    def useInput(self, event, board, paused):
+        # Only allow input of game is running
+        if not paused:
             if event.type==KEYDOWN and event.key==K_RETURN:
                 if len(self.curMoveChain)>=2: #need at least a start and an end
                     # Actually make the move
-                    self.make_move(self.curMoveChain[0], self.curMoveChain[-1])
+                    board.make_move(self.curMoveChain[0], self.curMoveChain[-1])
                     self.curMoveChain = [] # Empty the move chain
+                    return True # Notify the caller that a move was made
             elif event.type==KEYDOWN and event.key==K_BACKSPACE:
                 if len(self.curMoveChain)>0:
                     self.curMoveChain=self.curMoveChain[:-1]
             elif event.type==MOUSEBUTTONDOWN:
                 pos=event.pos
-                point=self.board.getNearestPoint(pos)
+                point=board.getNearestPoint(pos)
                 if not point:
                     return False #click wasn't near any points on the board
                 elif len(self.curMoveChain)==0:
@@ -296,6 +296,8 @@ class player:
                         self.curMoveChain=[point]
                 elif self.curMoveChain[-1].canJumpTo(point,len(self.curMoveChain)==1):
                     self.curMoveChain.append(point)
+        # No move was made
+        return False
 
     #Current intended move procedure: click the piece you want to move,
         #then click each circle on your path, then press enter when you're done.
@@ -304,18 +306,27 @@ class player:
         #If you press Enter without having selected a valid move, nothing will happen.
 
 class Network:
-    def __init__(self, socket):
+    def __init__(self, socket, player_num):
         # Socket to read to and write from
         self.socket = socket
+        # Local player's player number
+        self.number = player_num
         # Message length to be receiving
-        self.mess_len = len("xo,yo:xt,yt")
+        self.mess_len = len("0xo,0yo:0xt,0yt")
     
     # If something fails at any point here, nothing can be done, so let it
     def get_turn(self, board):
         # Receive a move from the socket
-        msg = self.socket.recv(self.mess_len1)
+        msg = self.socket.recv(self.mess_len)
+        # If too-short message received
+        if len(msg) < self.mess_len:
+            print "Opponent exited."
+            # Close socket and set to none for screen to see
+            self.socket.close()
+            self.socket = None
+            return
         # Get parts out of message
-        parts = move.split(":")
+        parts = msg.split(":")
         origin = parts[0].split(",")
         target = parts[1].split(",")
         # Then convert them to ints
@@ -330,20 +341,21 @@ class Network:
         board.make_move(source, destination)
 
     def send_turn(self, move):
-        # Turn the move into a string
-        msg = "{},{}:{},{}".format(\
+        # Turn the move into a string and pad numbers
+        msg = "{0:03d},{1:03d}:{2:03d},{3:03d}".format(\
                 move[0][0], move[0][1],\
                 move[1][0], move[1][1])
         # Send the message over the socket
         self.socket.sendall(msg)
 
-    def close(self):
-        self.socket.close()
-
 class screen: #the pygame screen and high-level "running the game" stuff
     def __init__(self,board,xDim,yDim,network):
         self.board=board
         self.network = network # Can play a networked game
+        if self.network != None:
+            # Set the board's local and remote players
+            self.board.players[network.number - 1].remote = False
+            self.board.players[network.number % self.board.numPlayers].remote = True
         # Graphics related things
         self.xDim=xDim
         self.yDim=yDim
@@ -364,9 +376,6 @@ class screen: #the pygame screen and high-level "running the game" stuff
         self.paused = False #Whether or not the game is paused
         self.turnTimeTaken = 0 #Time taken for the current turn in ms
         self.maximumTurnTime = 10000 #Maximum time allowed per turn in ms
-        self.mainloop() #this has to be the last thing in the init before exit,
-        #because it isn't supposed to terminate until you end the session
-        pygame.display.quit()
 
     def mainloop(self):
         try:
@@ -384,38 +393,53 @@ class screen: #the pygame screen and high-level "running the game" stuff
             self.running = False
             # Raise the exception
             raise
+        # Exit the game at the end of the loop
+        pygame.display.quit()
 
     # Game update, handles AI and input
     def update(self):
+        # Make sure the game is running and players are playing
         while self.running and self.playing:
+            # Exit if network closes
+            if self.network != None and self.network.socket == None:
+                return
             self.play_turn(self.board)
             self.checkWin()
+            # The turn timer does not work for networked games
+            if self.network == None:
+                #Handle time outs during player turns
+                self.turnTimeTaken += self.clock.get_time() #Increment the turn timer
+                if self.turnTimeTaken > self.maximumTurnTime:
+                    self.board.passTurn()
+                    self.turnTimeTaken = 0
             # Maintain update rate to FPS
             self.clock.tick(self.fps)
 
     # Display updating, handles display and input
     def display(self):
+        curr_player = self.board.curPlayer
         while self.running:
             self.drawScreen()
             self.getInput(self.board)
-            #Handle time outs during player turns
-            self.turnTimeTaken += self.clock.get_time() #Increment the turn timer
-            if self.turnTimeTaken > self.maximumTurnTime:
-                self.board.curPlayer = self.board.players[self.board.curPlayer.number%self.board.numPlayers]
-                self.turnTimeTaken = 0
 
     def play_turn(self, board):
+        player = board.curPlayer
         # If the current player is not remote
-        if not board.curPlayer.remote:
-            if board.curPlayer.AI: # AI
-                board.AIMove(board.curPlayer.number)
+        if not player.remote:
+            if player.AI: # AI
+                board.AIMove(player.number)
+                # And end of turn, reset timer
+                self.turnTimeTaken = 0
             else: # Human
                 self.getInput(board)
         # Otherwise get the turn from the network
         else:
             self.network.get_turn(board)
         # If the game is networked and the player is local
-        if self.network != None and not board.curPlayer.remote:
+        if self.network != None and not player.remote:
+            # Wait until a move was made
+            while board.curPlayer == player:
+                pass
             # Then we need to send the remote player the move
             self.network.send_turn(board.moves[-1])
 
@@ -436,9 +460,14 @@ class screen: #the pygame screen and high-level "running the game" stuff
                 elif event.key == pygame.K_p:
                     self.paused = not self.paused
             else:
-                # If it's a human player's turn, accept their input
-                if self.playing and not board.curPlayer.AI:
-                    board.curPlayer.useInput(board,event)
+                # If it's a human non-remote player's turn, accept their input
+                if self.playing and\
+                        not board.curPlayer.AI and\
+                        not board.curPlayer.remote:
+                    # Handle the input
+                    if board.curPlayer.useInput(event, board, self.paused):
+                        # And reset the timer if a move was performed
+                        self.turnTimeTaken = 0
 
     def saveGame(self):
         f = open('save.dat', 'w')
@@ -485,6 +514,13 @@ class screen: #the pygame screen and high-level "running the game" stuff
             self.gameScreen.blit(self.font.render(self.instructions[i], True, (0,0,255)), (20, 450+30*i))
         self.gameScreen.blit(self.font.render("Current player: "+str(self.board.curPlayer.number), True, (0,0,255)), (20, 10))
         self.gameScreen.blit(self.font.render(self.winMessage, True, (0,0,255)), (20, 40))
+        self.gameScreen.blit(self.font.render("Time left for current turn: " + str((self.maximumTurnTime - self.turnTimeTaken) / 1000) + " sec", True, (0,0,255)), (20, 570))
+        pausemsg = "The game is currently "
+        if self.paused:
+            pausemsg = pausemsg + "paused"
+        else:
+            pausemsg = pausemsg + "not paused"
+        self.gameScreen.blit(self.font.render(pausemsg, True, (0,0,255)), (20, 600))
         pygame.display.flip()
 
     def checkWin(self):
@@ -515,12 +551,51 @@ class screen: #the pygame screen and high-level "running the game" stuff
             self.winMessage+="Player 3 wins!"
             self.playing = False
         
-#change this line to control the number of players, which, if any, are AIs, and the AI difficulties
-test=board(2,[True,True], [2,3])
-game=screen(test,450,1000, None)
-game.mainloop() #this has to be the last thing before exit,
-#because it isn't supposed to terminate until you end the session
-pygame.display.quit()
+
+# Only call this if the file is run, not imported
+if __name__ == '__main__':
+    # Default options
+    num_players = 2
+    ais = [False, True]
+    difficulties = [2, 3]
+    # Read arguments for game setup; if diretional_slide_ai is being used.
+    # only two players can play.
+    argc, argv = len(sys.argv), sys.argv
+    try:
+        # Count the players and see which are AI and which are human
+        if argc > 1:
+            num_players = 0
+            for i in range(len(argv[1])):
+                # Takes a string of T and F (True, False)
+                if argv[1][i] == "T":
+                    ais[i] = True
+                else:
+                    ais[i] = False
+                num_players += 1
+        # Set the difficulties passed to the command line
+        if argc == 3:
+            for i in range(len(argv[2])):
+                num = int(argv[2][i])
+                if 0 <= num <= 3:
+                    difficulties[i] = num
+                elif num < 0:
+                    difficulties[i] = 0
+                else:
+                    difficulties[i] = 3
+    # If an int could not be converted correctly, do not worry,
+    # as defaults will be used.
+    except ValueError:
+        pass
+    # Otherwise raise the error
+    except:
+        raise
+    # Create a board with AI/human players and AI difficulties
+    b = board(num_players, ais, difficulties)
+    game = screen(b, 450, 1000, None)
+    # Run the game loop
+    game.mainloop()
+    # Quit the display
+    pygame.display.quit()
 
 #Code provenance notes:
     #Instructions and code for putting text on the screen were borrowed from
